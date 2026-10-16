@@ -8,7 +8,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
     body { background-color: #e8e3dd; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
+    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: ctor; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .logo { font-weight: 700; font-size: 20px; color: #c85a38; }
     .badge { font-size: 12px; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-weight: 600; color: #555; }
@@ -57,9 +57,9 @@
       <div id="quota-tag" class="badge" style="display:none;"></div>
     </div>
 
-    <!-- AUTH -->
+    <!-- AUTH SCREEN -->
     <div id="auth-screen">
-      <h2 style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Connexion / Inscription</h2>
+      <h2 style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Créer votre profil</h2>
       <form id="register-form">
         <div class="avatar-container">
           <div class="avatar-wrapper" onclick="document.getElementById('photo-file').click()">
@@ -109,8 +109,8 @@
       <div class="profile-card" id="card-box">
         <img id="target-img" src="" alt="Photo">
         <div class="profile-info">
-          <h3 id="target-title">Chargement...</h3>
-          <p id="target-loc">Recherche à proximité...</p>
+          <h3 id="target-title">Recherche...</h3>
+          <p id="target-loc">Patientez...</p>
         </div>
       </div>
 
@@ -120,13 +120,13 @@
       </div>
     </div>
 
-    <!-- PAYWALL SCREEN -->
+    <!-- PAYWALL -->
     <div id="paywall-screen">
       <div class="paywall-box">
         <h3>⚡ Quota de likes épuisé !</h3>
-        <p>Vous avez utilisé vos 10 likes gratuits du jour. Passez au Pass Illimité pour continuer à liker sans restriction.</p>
+        <p>Vous avez utilisé vos 10 likes gratuits du jour. Passez au Pass Illimité pour continuer.</p>
         <div class="price-tag">4,99 €</div>
-        <button class="btn-main" onclick="upgradeToPremium()">Débloquer l'illimité (Stripe)</button>
+        <button class="btn-main" onclick="upgradeToPremium()">Débloquer l'illimité</button>
         <button class="btn-nav" style="margin-top:10px; width:100%;" onclick="backToSwipe()">Retour</button>
       </div>
     </div>
@@ -215,7 +215,7 @@
     function showCard() {
       if (currentIdx >= profilesList.length) {
         document.getElementById('target-title').textContent = "Plus de profils";
-        document.getElementById('target-loc').textContent = "Revenez plus tard !";
+        document.getElementById('target-loc').textContent = "Ouvrez un autre navigateur pour créer un 2ème profil et tester !";
         document.getElementById('target-img').src = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300";
         document.getElementById('action-btns').style.display = 'none';
         return;
@@ -258,6 +258,8 @@
           matches.push(targetUser);
           document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
           alert(`🎉 NOUVEAU MATCH avec ${targetUser.prenom} !`);
+        } else {
+          alert(`Vous avez liké ${targetUser.prenom}. En attente de son retour !`);
         }
       }
 
@@ -276,7 +278,7 @@
         currentUser = data.user;
         localStorage.setItem('activeUser', JSON.stringify(currentUser));
         updateQuota();
-        alert("Paiement réussi ! Vous avez désormais les likes illimités.");
+        alert("Paiement réussi ! Likes illimités débloqués.");
         backToSwipe();
       }
     }
@@ -286,10 +288,10 @@
       document.getElementById('app-screen').style.display = 'block';
     }
 
-    socket.on('match', ({ withUser }) => {
+    socket.on('match_notification', ({ withUser }) => {
       matches.push(withUser);
       document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
-      alert(`🎉 Vous avez été liké en retour par ${withUser.prenom} ! Match validé.`);
+      alert(`🎉 C'EST UN MATCH ! ${withUser.prenom} vous a liké en retour !`);
     });
 
     function showChatList() {
