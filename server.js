@@ -11,22 +11,20 @@ app.use(express.static('public'));
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-// Base de données en mémoire (persistante tant que le serveur tourne)
-let users = {}; 
-let messages = {}; 
+let users = {}; // Stocke les utilisateurs connectés
+let likes = {}; // Stocke qui a liké qui : { "prenom1": ["prenom2"] }
+let matches = [];
 
 app.post('/api/register', (req, res) => {
   const user = req.body;
   if (!user.prenom) return res.status(400).json({ error: 'Prénom requis' });
   
-  const key = user.prenom.toLowerCase();
+  const key = user.prenom.trim().toLowerCase();
   if (!users[key]) {
     users[key] = {
       ...user,
       likesLeft: user.genre === 'Homme' ? 10 : Infinity,
-      isPremium: false,
-      likes: [],
-      matches: []
+      isPremium: false
     };
   }
   
@@ -34,13 +32,15 @@ app.post('/api/register', (req, res) => {
 });
 
 app.get('/api/profiles/:prenom', (req, res) => {
-  const currentKey = req.params.prenom.toLowerCase();
+  const currentKey = req.params.prenom.trim().toLowerCase();
   const currentUser = users[currentKey];
   if (!currentUser) return res.json([]);
 
+  // Récupérer tous les autres utilisateurs inscrits
   const available = Object.values(users).filter(u => {
-    return u.prenom.toLowerCase() !== currentKey && 
-           !currentUser.likes.includes(u.prenom.toLowerCase());
+    const uKey = u.prenom.trim().toLowerCase();
+    const userLikes = likes[currentKey] || [];
+    return uKey !== currentKey && !userLikes.includes(uKey);
   });
 
   res.json(available);
@@ -48,31 +48,31 @@ app.get('/api/profiles/:prenom', (req, res) => {
 
 app.post('/api/like', (req, res) => {
   const { from, to } = req.body;
-  const fromKey = from.toLowerCase();
-  const toKey = to.toLowerCase();
+  const fromKey = from.trim().toLowerCase();
+  const toKey = to.trim().toLowerCase();
 
   const user = users[fromKey];
   if (!user) return res.status(400).json({ error: 'Utilisateur inconnu' });
 
-  // Vérification du quota pour les hommes non premium
+  // Quota pour les hommes
   if (user.genre === 'Homme' && !user.isPremium) {
     if (user.likesLeft <= 0) {
-      return res.json({ success: false, paywall: true, message: "Quota de likes épuisé" });
+      return res.json({ success: false, paywall: true });
     }
     user.likesLeft--;
   }
 
-  if (!user.likes.includes(toKey)) {
-    user.likes.push(toKey);
+  if (!likes[fromKey]) likes[fromKey] = [];
+  if (!likes[fromKey].includes(toKey)) {
+    likes[fromKey].push(toKey);
   }
 
+  // Vérifier si c'est un match (si l'autre a aussi liké 'from')
   let isMatch = false;
-  if (users[toKey] && users[toKey].likes.includes(fromKey)) {
+  const targetLikes = likes[toKey] || [];
+  if (targetLikes.includes(fromKey)) {
     isMatch = true;
-    if (!user.matches.includes(toKey)) user.matches.push(toKey);
-    if (!users[toKey].matches.includes(fromKey)) users[toKey].matches.push(fromKey);
-
-    io.to(toKey).emit('match', { withUser: user });
+    io.to(toKey).emit('match_notification', { withUser: user });
   }
 
   res.json({ success: true, isMatch, likesLeft: user.likesLeft });
@@ -80,7 +80,7 @@ app.post('/api/like', (req, res) => {
 
 app.post('/api/upgrade', (req, res) => {
   const { prenom } = req.body;
-  const key = prenom.toLowerCase();
+  const key = prenom.trim().toLowerCase();
   if (users[key]) {
     users[key].isPremium = true;
     users[key].likesLeft = Infinity;
@@ -91,22 +91,17 @@ app.post('/api/upgrade', (req, res) => {
 
 io.on('connection', (socket) => {
   socket.on('join', (prenom) => {
-    if (prenom) socket.join(prenom.toLowerCase());
+    if (prenom) socket.join(prenom.trim().toLowerCase());
   });
 
   socket.on('send_message', ({ from, to, text }) => {
-    const matchKey = [from.toLowerCase(), to.toLowerCase()].sort().join('_');
-    if (!messages[matchKey]) messages[matchKey] = [];
-    
-    const msgData = { from, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-    messages[matchKey].push(msgData);
-
-    io.to(from.toLowerCase()).emit('receive_message', msgData);
-    io.to(to.toLowerCase()).emit('receive_message', msgData);
+    const data = { from, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+    io.to(to.trim().toLowerCase()).emit('receive_message', data);
+    io.to(from.trim().toLowerCase()).emit('receive_message', data);
   });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Serveur Amour & Cie actif sur le port ${PORT}`);
+  console.log(`Serveur actif sur le port ${PORT}`);
 });
