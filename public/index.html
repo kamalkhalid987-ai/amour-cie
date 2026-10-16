@@ -4,33 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amour & Cie</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
     body { background-color: #e8e3dd; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .logo { font-weight: 700; font-size: 20px; color: #c85a38; }
     .badge { font-size: 12px; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-weight: 600; color: #555; }
     
-    .avatar-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 18px; }
-    .avatar-wrapper { width: 100px; height: 100px; border-radius: 50%; overflow: hidden; border: 3px solid #c85a38; margin-bottom: 10px; cursor: pointer; background: #eee; }
+    .avatar-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; }
+    .avatar-wrapper { width: 90px; height: 90px; border-radius: 50%; overflow: hidden; border: 3px solid #c85a38; margin-bottom: 8px; cursor: pointer; background: #eee; }
     .avatar-wrapper img { width: 100%; height: 100%; object-fit: cover; }
     
     .btn-secondary { background-color: #558b6e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .form-group { margin-bottom: 12px; }
     label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 600; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fafafa; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fafafa; }
     .row { display: flex; gap: 8px; }
     .row .form-group { flex: 1; }
     
     .btn-main { width: 100%; background-color: #c85a38; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; }
-    .btn-main:hover { background-color: #b04e30; }
     
-    .nav-toggle { text-align: center; margin-top: 12px; font-size: 13px; color: #558b6e; cursor: pointer; text-decoration: underline; font-weight: 600; }
-    
-    /* Interface Swipe */
-    #app-screen { display: none; }
-    .profile-card { position: relative; width: 100%; height: 360px; border-radius: 16px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
+    #app-screen, #chat-screen, #paywall-screen { display: none; }
+    .profile-card { position: relative; width: 100%; height: 350px; border-radius: 16px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
     .profile-card img { width: 100%; height: 100%; object-fit: cover; }
     .profile-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: white; padding: 15px; }
     
@@ -38,7 +35,18 @@
     .btn-act { width: 55px; height: 55px; border-radius: 50%; border: none; font-size: 22px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
     .btn-no { background: #fff; color: #ff4d4d; }
     .btn-yes { background: #2b7a78; color: white; }
-    .btn-logout { background: none; border: none; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; margin-top: 15px; width: 100%; text-align: center; }
+    .btn-nav { background: #f0f0f0; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+
+    .paywall-box { text-align: center; padding: 15px 0; }
+    .paywall-box h3 { color: #c85a38; margin-bottom: 10px; font-size: 20px; }
+    .paywall-box p { font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.4; }
+    .price-tag { font-size: 24px; font-weight: 700; color: #2b7a78; margin-bottom: 15px; }
+
+    .chat-box { height: 260px; border: 1px solid #eee; border-radius: 12px; padding: 10px; overflow-y: auto; background: #fafafa; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; }
+    .msg-me { background: #c85a38; color: white; align-self: flex-end; }
+    .msg-them { background: #e0e0e0; color: #333; align-self: flex-start; }
+    .chat-input-row { display: flex; gap: 6px; }
   </style>
 </head>
 <body>
@@ -49,22 +57,10 @@
       <div id="quota-tag" class="badge" style="display:none;"></div>
     </div>
 
-    <!-- ÉCRAN CONNEXION / INSCRIPTION -->
+    <!-- AUTH -->
     <div id="auth-screen">
-      <h2 id="auth-title" style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Connexion à votre compte</h2>
-
-      <!-- Formulaire Connexion -->
-      <form id="login-form">
-        <div class="form-group">
-          <label>Votre Prénom</label>
-          <input type="text" id="login-prenom" placeholder="Saisissez votre prénom..." required>
-        </div>
-        <button type="submit" class="btn-main">Se connecter</button>
-        <div class="nav-toggle" onclick="toggleAuth(true)">Pas encore de compte ? S'inscrire</div>
-      </form>
-
-      <!-- Formulaire Inscription -->
-      <form id="register-form" style="display:none;">
+      <h2 style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Connexion / Inscription</h2>
+      <form id="register-form">
         <div class="avatar-container">
           <div class="avatar-wrapper" onclick="document.getElementById('photo-file').click()">
             <img id="avatar-img" src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300" alt="Photo">
@@ -85,10 +81,7 @@
           </div>
           <div class="form-group">
             <label>Ville</label>
-            <div style="display:flex; gap:4px;">
-              <input type="text" id="reg-ville" placeholder="Ville" required>
-              <button type="button" class="btn-secondary" id="btn-gps">📍</button>
-            </div>
+            <input type="text" id="reg-ville" placeholder="Ville" required>
           </div>
         </div>
 
@@ -100,179 +93,245 @@
               <option value="Femme">Une Femme</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Je cherche :</label>
-            <select id="reg-recherche">
-              <option value="Femme">Une Femme</option>
-              <option value="Homme">Un Homme</option>
-            </select>
-          </div>
         </div>
 
-        <button type="submit" class="btn-main">Créer mon compte</button>
-        <div class="nav-toggle" onclick="toggleAuth(false)">Déjà inscrit ? Se connecter</div>
+        <button type="submit" class="btn-main">Entrer dans l'application</button>
       </form>
     </div>
 
-    <!-- ÉCRAN DE L'APPLICATION (SWIPE/LIKES) -->
+    <!-- SWIPE SCREEN -->
     <div id="app-screen">
-      <div class="profile-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <button class="btn-nav" id="btn-matches-list" onclick="showChatList()">💬 Messages (0)</button>
+        <button class="btn-nav" onclick="logout()">Se déconnecter</button>
+      </div>
+
+      <div class="profile-card" id="card-box">
         <img id="target-img" src="" alt="Photo">
         <div class="profile-info">
-          <h3 id="target-title">Sonia, 24</h3>
-          <p id="target-loc">📍 Paris</p>
+          <h3 id="target-title">Chargement...</h3>
+          <p id="target-loc">Recherche à proximité...</p>
         </div>
       </div>
 
-      <div class="actions">
-        <button class="btn-act btn-no" onclick="likeProfile(false)">❌</button>
-        <button class="btn-act btn-yes" onclick="likeProfile(true)">❤️</button>
+      <div class="actions" id="action-btns">
+        <button class="btn-act btn-no" onclick="handleLike(false)">❌</button>
+        <button class="btn-act btn-yes" onclick="handleLike(true)">❤️</button>
       </div>
+    </div>
 
-      <button class="btn-logout" onclick="logout()">Se déconnecter</button>
+    <!-- PAYWALL SCREEN -->
+    <div id="paywall-screen">
+      <div class="paywall-box">
+        <h3>⚡ Quota de likes épuisé !</h3>
+        <p>Vous avez utilisé vos 10 likes gratuits du jour. Passez au Pass Illimité pour continuer à liker sans restriction.</p>
+        <div class="price-tag">4,99 €</div>
+        <button class="btn-main" onclick="upgradeToPremium()">Débloquer l'illimité (Stripe)</button>
+        <button class="btn-nav" style="margin-top:10px; width:100%;" onclick="backToSwipe()">Retour</button>
+      </div>
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div id="chat-screen">
+      <button class="btn-nav" onclick="showSwipe()">⬅️ Retour au Swipe</button>
+      <h3 id="chat-with-name" style="margin-bottom:10px; color:#c85a38;">Discussion</h3>
+      <div class="chat-box" id="chat-box"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Votre message...">
+        <button class="btn-secondary" onclick="sendMessage()">Envoyer</button>
+      </div>
     </div>
   </div>
 
   <script>
+    const socket = io();
     let currentUser = JSON.parse(localStorage.getItem('activeUser')) || null;
-    let profiles = [
-      { name: "Sonia", age: 24, city: "Paris", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600" },
-      { name: "Clara", age: 27, city: "Lyon", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600" },
-      { name: "Elena", age: 23, city: "Bordeaux", photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=600" }
-    ];
+    let profilesList = [];
     let currentIdx = 0;
+    let activeChatPartner = null;
+    let matches = [];
 
-    // Chargement dynamique de la photo de profil
     document.getElementById('photo-file').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = function(evt) {
-          document.getElementById('avatar-img').src = evt.target.result;
-        };
+        reader.onload = (evt) => document.getElementById('avatar-img').src = evt.target.result;
         reader.readAsDataURL(file);
       }
     });
 
-    // Géolocalisation GPS
-    document.getElementById('btn-gps').addEventListener('click', function() {
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-          try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
-            const data = await res.json();
-            document.getElementById('reg-ville').value = data.address.city || data.address.town || 'Paris';
-          } catch(e) { document.getElementById('reg-ville').value = 'Paris'; }
-        }, () => alert("Activez la géolocalisation sur votre appareil."));
-      }
-    });
-
-    // Basculer entre Connexion et Inscription
-    function toggleAuth(showRegister) {
-      document.getElementById('login-form').style.display = showRegister ? 'none' : 'block';
-      document.getElementById('register-form').style.display = showRegister ? 'block' : 'none';
-      document.getElementById('auth-title').textContent = showRegister ? 'Créer votre compte' : 'Connexion à votre compte';
-    }
-
-    // Gestion Inscription
-    document.getElementById('register-form').addEventListener('submit', function(e) {
+    document.getElementById('register-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       const user = {
-        prenom: document.getElementById('reg-prenom').value,
+        prenom: document.getElementById('reg-prenom').value.trim(),
         age: document.getElementById('reg-age').value,
         ville: document.getElementById('reg-ville').value,
         genre: document.getElementById('reg-genre').value,
-        likesLeft: document.getElementById('reg-genre').value === 'Homme' ? 10 : Infinity,
         photo: document.getElementById('avatar-img').src
       };
 
-      // Sauvegarder dans la mémoire du navigateur
-      localStorage.setItem('user_' + user.prenom.toLowerCase(), JSON.stringify(user));
-      loginUser(user);
-    });
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+      });
+      const data = await res.json();
 
-    // Gestion Connexion
-    document.getElementById('login-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const prenom = document.getElementById('login-prenom').value.trim().toLowerCase();
-      const savedUser = localStorage.getItem('user_' + prenom);
-
-      if (savedUser) {
-        loginUser(JSON.parse(savedUser));
-      } else {
-        alert("Aucun compte trouvé avec ce prénom. Veuillez vous inscrire !");
-        toggleAuth(true);
+      if (data.success) {
+        currentUser = data.user;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        initApp();
       }
     });
 
-    function loginUser(user) {
-      currentUser = user;
-      localStorage.setItem('activeUser', JSON.stringify(user));
-
-      // Notifications push
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission();
-      }
+    function initApp() {
+      if (!currentUser) return;
+      socket.emit('join', currentUser.prenom);
 
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('app-screen').style.display = 'block';
 
       updateQuota();
-      showCard();
+      fetchProfiles();
     }
 
     function updateQuota() {
       const q = document.getElementById('quota-tag');
       q.style.display = 'block';
-      if (currentUser.genre === 'Femme') {
-        q.textContent = 'Likes : Illimités ♾️';
+      if (currentUser.genre === 'Femme' || currentUser.isPremium) {
+        q.textContent = 'Illimité ♾️';
       } else {
         q.textContent = `Likes : ${currentUser.likesLeft}/10`;
       }
     }
 
-    function showCard() {
-      if (currentIdx >= profiles.length) {
-        alert("Plus de profils disponibles aux alentours.");
-        return;
-      }
-      const p = profiles[currentIdx];
-      document.getElementById('target-img').src = p.photo;
-      document.getElementById('target-title').textContent = `${p.name}, ${p.age}`;
-      document.getElementById('target-loc').textContent = `📍 ${p.city}`;
+    async function fetchProfiles() {
+      const res = await fetch('/api/profiles/' + currentUser.prenom);
+      profilesList = await res.json();
+      currentIdx = 0;
+      showCard();
     }
 
-    function likeProfile(isLike) {
-      if (isLike && currentUser.genre === 'Homme') {
-        if (currentUser.likesLeft <= 0) {
-          alert("Limite de 10 likes par jour atteinte !");
-          return;
-        }
-        currentUser.likesLeft--;
-        localStorage.setItem('user_' + currentUser.prenom.toLowerCase(), JSON.stringify(currentUser));
-        localStorage.setItem('activeUser', JSON.stringify(currentUser));
-        updateQuota();
+    function showCard() {
+      if (currentIdx >= profilesList.length) {
+        document.getElementById('target-title').textContent = "Plus de profils";
+        document.getElementById('target-loc').textContent = "Revenez plus tard !";
+        document.getElementById('target-img').src = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300";
+        document.getElementById('action-btns').style.display = 'none';
+        return;
       }
 
-      if (isLike && Math.random() > 0.4) {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification("Nouveau Match ! ❤️", { body: `${profiles[currentIdx].name} vous a également liké !` });
+      document.getElementById('action-btns').style.display = 'flex';
+      const p = profilesList[currentIdx];
+      document.getElementById('target-img').src = p.photo;
+      document.getElementById('target-title').textContent = `${p.prenom}, ${p.age}`;
+      document.getElementById('target-loc').textContent = `📍 ${p.ville}`;
+    }
+
+    async function handleLike(isLike) {
+      if (!isLike) {
+        currentIdx++;
+        showCard();
+        return;
+      }
+
+      const targetUser = profilesList[currentIdx];
+      const res = await fetch('/api/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: currentUser.prenom, to: targetUser.prenom })
+      });
+      const data = await res.json();
+
+      if (data.paywall) {
+        document.getElementById('app-screen').style.display = 'none';
+        document.getElementById('paywall-screen').style.display = 'block';
+        return;
+      }
+
+      if (data.success) {
+        currentUser.likesLeft = data.likesLeft;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        updateQuota();
+
+        if (data.isMatch) {
+          matches.push(targetUser);
+          document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
+          alert(`🎉 NOUVEAU MATCH avec ${targetUser.prenom} !`);
         }
-        alert(`Match ! ❤️ Vous avez matché avec ${profiles[currentIdx].name}`);
       }
 
       currentIdx++;
       showCard();
     }
 
+    async function upgradeToPremium() {
+      const res = await fetch('/api/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prenom: currentUser.prenom })
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentUser = data.user;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        updateQuota();
+        alert("Paiement réussi ! Vous avez désormais les likes illimités.");
+        backToSwipe();
+      }
+    }
+
+    function backToSwipe() {
+      document.getElementById('paywall-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+    }
+
+    socket.on('match', ({ withUser }) => {
+      matches.push(withUser);
+      document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
+      alert(`🎉 Vous avez été liké en retour par ${withUser.prenom} ! Match validé.`);
+    });
+
+    function showChatList() {
+      if (matches.length === 0) {
+        alert("Aucun match pour le moment !");
+        return;
+      }
+      activeChatPartner = matches[0];
+      document.getElementById('app-screen').style.display = 'none';
+      document.getElementById('chat-screen').style.display = 'block';
+      document.getElementById('chat-with-name').textContent = `Discussion avec ${activeChatPartner.prenom}`;
+    }
+
+    function showSwipe() {
+      document.getElementById('chat-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text || !activeChatPartner) return;
+      socket.emit('send_message', { from: currentUser.prenom, to: activeChatPartner.prenom, text });
+      input.value = '';
+    }
+
+    socket.on('receive_message', (msg) => {
+      const box = document.getElementById('chat-box');
+      const div = document.createElement('div');
+      div.className = `msg ${msg.from.toLowerCase() === currentUser.prenom.toLowerCase() ? 'msg-me' : 'msg-them'}`;
+      div.textContent = `${msg.text} (${msg.time})`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    });
+
     function logout() {
       localStorage.removeItem('activeUser');
       location.reload();
     }
 
-    // Auto-connexion si déjà connecté
     if (currentUser) {
-      loginUser(currentUser);
+      initApp();
     }
   </script>
 </body>
