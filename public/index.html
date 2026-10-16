@@ -8,7 +8,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
     body { background-color: #e8e3dd; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: ctor; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
+    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .logo { font-weight: 700; font-size: 20px; color: #c85a38; }
     .badge { font-size: 12px; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-weight: 600; color: #555; }
@@ -25,8 +25,9 @@
     .row .form-group { flex: 1; }
     
     .btn-main { width: 100%; background-color: #c85a38; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+    .nav-toggle { text-align: center; margin-top: 12px; font-size: 13px; color: #558b6e; cursor: pointer; text-decoration: underline; font-weight: 600; }
     
-    #app-screen, #chat-screen, #paywall-screen { display: none; }
+    #app-screen, #chat-screen, #paywall-screen, #register-form { display: none; }
     .profile-card { position: relative; width: 100%; height: 350px; border-radius: 16px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
     .profile-card img { width: 100%; height: 100%; object-fit: cover; }
     .profile-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: white; padding: 15px; }
@@ -57,21 +58,42 @@
       <div id="quota-tag" class="badge" style="display:none;"></div>
     </div>
 
-    <!-- AUTH SCREEN -->
+    <!-- AUTH SECTION (CONNEXION & INSCRIPTION) -->
     <div id="auth-screen">
-      <h2 style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Créer votre profil</h2>
+      <h2 id="auth-title" style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Connexion à votre compte</h2>
+      
+      <!-- Formulaire de Connexion -->
+      <form id="login-form">
+        <div class="form-group">
+          <label>Prénom</label>
+          <input type="text" id="login-prenom" placeholder="Votre prénom" required>
+        </div>
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <input type="password" id="login-password" placeholder="Votre mot de passe" required>
+        </div>
+        <button type="submit" class="btn-main">Se connecter</button>
+        <div class="nav-toggle" onclick="toggleAuth(true)">Pas encore de compte ? S'inscrire</div>
+      </form>
+
+      <!-- Formulaire d'Inscription (avec GPS intégré) -->
       <form id="register-form">
         <div class="avatar-container">
           <div class="avatar-wrapper" onclick="document.getElementById('photo-file').click()">
             <img id="avatar-img" src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300" alt="Photo">
           </div>
-          <button type="button" class="btn-secondary" onclick="document.getElementById('photo-file').click()">🖼️ Importer une photo</button>
+          <button type="button" class="btn-secondary" onclick="document.getElementById('photo-file').click()">🖼️ Choisir une photo</button>
           <input type="file" id="photo-file" accept="image/*" style="display:none;">
         </div>
 
         <div class="form-group">
-          <label>Prénom</label>
+          <label>Prénom (Identifiant unique)</label>
           <input type="text" id="reg-prenom" placeholder="Votre prénom..." required>
+        </div>
+
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <input type="password" id="reg-password" placeholder="Mot de passe pour vous reconnecter" required>
         </div>
 
         <div class="row">
@@ -81,7 +103,10 @@
           </div>
           <div class="form-group">
             <label>Ville</label>
-            <input type="text" id="reg-ville" placeholder="Ville" required>
+            <div style="display:flex; gap:4px;">
+              <input type="text" id="reg-ville" placeholder="Ville" required>
+              <button type="button" class="btn-secondary" id="btn-gps" title="Détecter position GPS">📍 GPS</button>
+            </div>
           </div>
         </div>
 
@@ -95,7 +120,8 @@
           </div>
         </div>
 
-        <button type="submit" class="btn-main">Entrer dans l'application</button>
+        <button type="submit" class="btn-main">Créer mon compte</button>
+        <div class="nav-toggle" onclick="toggleAuth(false)">Déjà un compte ? Se connecter</div>
       </form>
     </div>
 
@@ -120,14 +146,14 @@
       </div>
     </div>
 
-    <!-- PAYWALL -->
+    <!-- PAYWALL (BLOCAGE APRES 10 LIKES POUR LES HOMMES) -->
     <div id="paywall-screen">
       <div class="paywall-box">
-        <h3>⚡ Quota de likes épuisé !</h3>
-        <p>Vous avez utilisé vos 10 likes gratuits du jour. Passez au Pass Illimité pour continuer.</p>
+        <h3>⚡ Quota de 10 likes atteint !</h3>
+        <p>En tant qu'homme, vous avez atteint vos 10 likes gratuits journaliers. Passez au Pass Illimité pour continuer à swiper sans limite.</p>
         <div class="price-tag">4,99 €</div>
-        <button class="btn-main" onclick="upgradeToPremium()">Débloquer l'illimité</button>
-        <button class="btn-nav" style="margin-top:10px; width:100%;" onclick="backToSwipe()">Retour</button>
+        <button class="btn-main" onclick="upgradeToPremium()">Payer & Débloquer l'illimité</button>
+        <button class="btn-nav" style="margin-top:10px; width:100%;" onclick="backToSwipe()">Attendre demain</button>
       </div>
     </div>
 
@@ -151,6 +177,27 @@
     let activeChatPartner = null;
     let matches = [];
 
+    // Basculer entre Connexion et Inscription
+    function toggleAuth(showRegister) {
+      document.getElementById('login-form').style.display = showRegister ? 'none' : 'block';
+      document.getElementById('register-form').style.display = showRegister ? 'block' : 'none';
+      document.getElementById('auth-title').textContent = showRegister ? 'Créer votre compte' : 'Connexion à votre compte';
+    }
+
+    // Gestion du GPS
+    document.getElementById('btn-gps').addEventListener('click', function() {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+            const data = await res.json();
+            document.getElementById('reg-ville').value = data.address.city || data.address.town || 'Paris';
+          } catch(e) { document.getElementById('reg-ville').value = 'Paris'; }
+        }, () => alert("Veuillez autoriser la géolocalisation."));
+      }
+    });
+
+    // Chargement photo
     document.getElementById('photo-file').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (file) {
@@ -160,10 +207,34 @@
       }
     });
 
+    // Connexion
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const prenom = document.getElementById('login-prenom').value;
+      const password = document.getElementById('login-password').value;
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prenom, password })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        currentUser = data.user;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        initApp();
+      } else {
+        alert(data.error);
+      }
+    });
+
+    // Inscription
     document.getElementById('register-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       const user = {
-        prenom: document.getElementById('reg-prenom').value.trim(),
+        prenom: document.getElementById('reg-prenom').value,
+        password: document.getElementById('reg-password').value,
         age: document.getElementById('reg-age').value,
         ville: document.getElementById('reg-ville').value,
         genre: document.getElementById('reg-genre').value,
@@ -181,6 +252,8 @@
         currentUser = data.user;
         localStorage.setItem('activeUser', JSON.stringify(currentUser));
         initApp();
+      } else {
+        alert(data.error);
       }
     });
 
@@ -215,7 +288,7 @@
     function showCard() {
       if (currentIdx >= profilesList.length) {
         document.getElementById('target-title').textContent = "Plus de profils";
-        document.getElementById('target-loc').textContent = "Ouvrez un autre navigateur pour créer un 2ème profil et tester !";
+        document.getElementById('target-loc').textContent = "Créez un autre compte dans un autre onglet pour tester !";
         document.getElementById('target-img').src = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300";
         document.getElementById('action-btns').style.display = 'none';
         return;
@@ -243,6 +316,7 @@
       });
       const data = await res.json();
 
+      // Si le quota homme est épuisé, affichage du Paywall de paiement
       if (data.paywall) {
         document.getElementById('app-screen').style.display = 'none';
         document.getElementById('paywall-screen').style.display = 'block';
@@ -258,8 +332,6 @@
           matches.push(targetUser);
           document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
           alert(`🎉 NOUVEAU MATCH avec ${targetUser.prenom} !`);
-        } else {
-          alert(`Vous avez liké ${targetUser.prenom}. En attente de son retour !`);
         }
       }
 
@@ -278,7 +350,7 @@
         currentUser = data.user;
         localStorage.setItem('activeUser', JSON.stringify(currentUser));
         updateQuota();
-        alert("Paiement réussi ! Likes illimités débloqués.");
+        alert("Paiement validé ! Vous disposez désormais des likes illimités.");
         backToSwipe();
       }
     }
