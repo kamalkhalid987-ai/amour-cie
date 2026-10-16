@@ -1,158 +1,413 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-// Remplacez 'votre_cle_secrete_stripe' par votre vraie clé secrète Stripe (commençant par sk_...)
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'votre_cle_secrete_stripe');
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amour & Cie</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+    body { background-color: #e8e3dd; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .logo { font-weight: 700; font-size: 20px; color: #c85a38; }
+    .badge { font-size: 12px; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-weight: 600; color: #555; }
+    
+    .avatar-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; }
+    .avatar-wrapper { width: 90px; height: 90px; border-radius: 50%; overflow: hidden; border: 3px solid #c85a38; margin-bottom: 8px; cursor: pointer; background: #eee; }
+    .avatar-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+    
+    .btn-secondary { background-color: #558b6e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 600; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fafafa; }
+    .row { display: flex; gap: 8px; }
+    .row .form-group { flex: 1; }
+    
+    .btn-main { width: 100%; background-color: #c85a38; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+    .nav-toggle { text-align: center; margin-top: 12px; font-size: 13px; color: #558b6e; cursor: pointer; text-decoration: underline; font-weight: 600; }
+    
+    #app-screen, #chat-screen, #paywall-screen, #register-form { display: none; }
+    .profile-card { position: relative; width: 100%; height: 350px; border-radius: 16px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
+    .profile-card img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: white; padding: 15px; }
+    
+    .actions { display: flex; justify-content: center; gap: 20px; }
+    .btn-act { width: 55px; height: 55px; border-radius: 50%; border: none; font-size: 22px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+    .btn-no { background: #fff; color: #ff4d4d; }
+    .btn-yes { background: #2b7a78; color: white; }
+    .btn-nav { background: #f0f0f0; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+    .paywall-box { text-align: center; padding: 15px 0; }
+    .paywall-box h3 { color: #c85a38; margin-bottom: 10px; font-size: 20px; }
+    .paywall-box p { font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.4; }
+    .price-tag { font-size: 24px; font-weight: 700; color: #2b7a78; margin-bottom: 15px; }
 
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+    .chat-box { height: 260px; border: 1px solid #eee; border-radius: 12px; padding: 10px; overflow-y: auto; background: #fafafa; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; }
+    .msg-me { background: #c85a38; color: white; align-self: flex-end; }
+    .msg-them { background: #e0e0e0; color: #333; align-self: flex-start; }
+    .chat-input-row { display: flex; gap: 6px; }
+  </style>
+</head>
+<body>
 
-let users = {}; 
-let likes = {}; 
+  <div class="card">
+    <div class="header">
+      <div class="logo">🌷 Amour & Cie</div>
+      <div id="quota-tag" class="badge" style="display:none;"></div>
+    </div>
 
-app.post('/api/register', (req, res) => {
-  const { prenom, password, age, ville, genre, photo } = req.body;
-  if (!prenom || !password) return res.status(400).json({ error: 'Identifiants requis' });
-  
-  const key = prenom.trim().toLowerCase();
-  if (users[key]) {
-    return res.status(400).json({ error: 'Ce prénom existe déjà. Connectez-vous !' });
-  }
+    <!-- AUTH SECTION -->
+    <div id="auth-screen">
+      <h2 id="auth-title" style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Connexion à votre compte</h2>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label>Prénom</label>
+          <input type="text" id="login-prenom" placeholder="Votre prénom" required>
+        </div>
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <input type="password" id="login-password" placeholder="Mot de passe" required>
+        </div>
+        <button type="submit" class="btn-main">Se connecter</button>
+        <div class="nav-toggle" onclick="toggleAuth(true)">Pas encore de compte ? S'inscrire</div>
+      </form>
 
-  users[key] = {
-    prenom: prenom.trim(),
-    password,
-    age,
-    ville,
-    genre,
-    photo,
-    likesLeft: genre === 'Homme' ? 10 : Infinity,
-    isPremium: false
-  };
-  
-  res.json({ success: true, user: users[key] });
-});
+      <form id="register-form">
+        <div class="avatar-container">
+          <div class="avatar-wrapper" onclick="document.getElementById('photo-file').click()">
+            <img id="avatar-img" src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300" alt="Photo">
+          </div>
+          <button type="button" class="btn-secondary" onclick="document.getElementById('photo-file').click()">🖼️ Choisir une photo</button>
+          <input type="file" id="photo-file" accept="image/*" style="display:none;">
+        </div>
 
-app.post('/api/login', (req, res) => {
-  const { prenom, password } = req.body;
-  const key = prenom.trim().toLowerCase();
-  
-  if (!users[key] || users[key].password !== password) {
-    return res.status(400).json({ error: 'Prénom ou mot de passe incorrect' });
-  }
+        <div class="form-group">
+          <label>Prénom (Identifiant unique)</label>
+          <input type="text" id="reg-prenom" placeholder="Votre prénom..." required>
+        </div>
 
-  res.json({ success: true, user: users[key] });
-});
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <input type="password" id="reg-password" placeholder="Mot de passe" required>
+        </div>
 
-app.get('/api/profiles/:prenom', (req, res) => {
-  const currentKey = req.params.prenom.trim().toLowerCase();
-  const currentUser = users[currentKey];
-  if (!currentUser) return res.json([]);
+        <div class="row">
+          <div class="form-group">
+            <label>Âge</label>
+            <input type="number" id="reg-age" placeholder="Ex: 25" required>
+          </div>
+          <div class="form-group">
+            <label>Ville</label>
+            <div style="display:flex; gap:4px;">
+              <input type="text" id="reg-ville" placeholder="Ville" required>
+              <button type="button" class="btn-secondary" id="btn-gps">📍 GPS</button>
+            </div>
+          </div>
+        </div>
 
-  const userLikes = likes[currentKey] || [];
-  const available = Object.values(users).filter(u => {
-    const uKey = u.prenom.trim().toLowerCase();
-    return uKey !== currentKey && !userLikes.includes(uKey);
-  });
+        <div class="row">
+          <div class="form-group">
+            <label>Je suis :</label>
+            <select id="reg-genre">
+              <option value="Homme">Un Homme</option>
+              <option value="Femme">Une Femme</option>
+            </select>
+          </div>
+        </div>
 
-  res.json(available);
-});
+        <button type="submit" class="btn-main">Créer mon compte</button>
+        <div class="nav-toggle" onclick="toggleAuth(false)">Déjà un compte ? Se connecter</div>
+      </form>
+    </div>
 
-app.post('/api/like', (req, res) => {
-  const { from, to } = req.body;
-  const fromKey = from.trim().toLowerCase();
-  const toKey = to.trim().toLowerCase();
+    <!-- SWIPE SCREEN -->
+    <div id="app-screen">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <button class="btn-nav" id="btn-matches-list" onclick="showChatList()">💬 Messages (0)</button>
+        <button class="btn-nav" onclick="logout()">Se déconnecter</button>
+      </div>
 
-  const user = users[fromKey];
-  if (!user) return res.status(400).json({ error: 'Utilisateur inconnu' });
+      <div class="profile-card" id="card-box">
+        <img id="target-img" src="" alt="Photo">
+        <div class="profile-info">
+          <h3 id="target-title">Recherche...</h3>
+          <p id="target-loc">Patientez...</p>
+        </div>
+      </div>
 
-  if (user.genre === 'Homme' && !user.isPremium) {
-    if (user.likesLeft <= 0) {
-      return res.json({ success: false, paywall: true, message: "Quota de 10 likes journaliers atteint." });
+      <div class="actions" id="action-btns">
+        <button class="btn-act btn-no" onclick="handleLike(false)">❌</button>
+        <button class="btn-act btn-yes" onclick="handleLike(true)">❤️</button>
+      </div>
+    </div>
+
+    <!-- PAYWALL SCREEN -->
+    <div id="paywall-screen">
+      <div class="paywall-box">
+        <h3>⚡ Quota de 10 likes atteint !</h3>
+        <p>Passez au Pass Illimité pour continuer à swiper sans restriction.</p>
+        <div class="price-tag">11,00 € / mois</div>
+        <button class="btn-main" onclick="startStripeCheckout()">Payer par Carte Bancaire</button>
+        <button class="btn-nav" style="margin-top:10px; width:100%;" onclick="backToSwipe()">Retour</button>
+      </div>
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div id="chat-screen">
+      <button class="btn-nav" onclick="showSwipe()">⬅️ Retour au Swipe</button>
+      <h3 id="chat-with-name" style="margin-bottom:10px; color:#c85a38;">Discussion</h3>
+      <div class="chat-box" id="chat-box"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Votre message...">
+        <button class="btn-secondary" onclick="sendMessage()">Envoyer</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let currentUser = JSON.parse(localStorage.getItem('activeUser')) || null;
+    let profilesList = [];
+    let currentIdx = 0;
+    let activeChatPartner = null;
+    let matches = [];
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+      const p = urlParams.get('user');
+      if (p) {
+        fetch('/api/upgrade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prenom: p })
+        }).then(res => res.json()).then(data => {
+          if (data.success) {
+            localStorage.setItem('activeUser', JSON.stringify(data.user));
+            window.location.href = '/';
+          }
+        });
+      }
     }
-    user.likesLeft--;
-  }
 
-  if (!likes[fromKey]) likes[fromKey] = [];
-  if (!likes[fromKey].includes(toKey)) {
-    likes[fromKey].push(toKey);
-  }
+    function toggleAuth(showRegister) {
+      document.getElementById('login-form').style.display = showRegister ? 'none' : 'block';
+      document.getElementById('register-form').style.display = showRegister ? 'block' : 'none';
+      document.getElementById('auth-title').textContent = showRegister ? 'Créer votre compte' : 'Connexion à votre compte';
+    }
 
-  let isMatch = false;
-  const targetLikes = likes[toKey] || [];
-  if (targetLikes.includes(fromKey)) {
-    isMatch = true;
-    io.to(toKey).emit('match_notification', { withUser: user });
-  }
-
-  res.json({ success: true, isMatch, likesLeft: user.likesLeft });
-});
-
-// Création d'une session de paiement Stripe (11 € / mois)
-app.post('/api/create-checkout-session', async (req, res) => {
-  const { prenom } = req.body;
-  const key = prenom ? prenom.trim().toLowerCase() : '';
-  
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: 'Pass Illimité Amour & Cie (Abonnement Mensuel)',
-          },
-          unit_amount: 1100, // 11,00 € en centimes
-          recurring: {
-            interval: 'month',
-          },
-        },
-        quantity: 1,
-      }],
-      mode: 'subscription',
-      success_url: `https://amour-cie-1.onrender.com/?success=true&user=${encodeURIComponent(prenom)}`,
-      cancel_url: `https://amour-cie-1.onrender.com/?canceled=true`,
+    document.getElementById('btn-gps').addEventListener('click', function() {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+            const data = await res.json();
+            document.getElementById('reg-ville').value = data.address.city || data.address.town || 'Paris';
+          } catch(e) { document.getElementById('reg-ville').value = 'Paris'; }
+        }, () => alert("Veuillez autoriser la géolocalisation."));
+      }
     });
 
-    res.json({ url: session.url });
-  } catch (e) {
-    console.error("Erreur Stripe:", e.message);
-    // Fallback de simulation si la clé Stripe n'est pas encore configurée sur Render
-    res.json({ simulated: true });
-  }
-});
+    document.getElementById('photo-file').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => document.getElementById('avatar-img').src = evt.target.result;
+        reader.readAsDataURL(file);
+      }
+    });
 
-// Route pour valider le statut Premium après paiement réussi
-app.post('/api/upgrade', (req, res) => {
-  const { prenom } = req.body;
-  const key = prenom.trim().toLowerCase();
-  if (users[key]) {
-    users[key].isPremium = true;
-    users[key].likesLeft = Infinity;
-    return res.json({ success: true, user: users[key] });
-  }
-  res.status(400).json({ error: 'Utilisateur non trouvé' });
-});
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prenom: document.getElementById('login-prenom').value,
+          password: document.getElementById('login-password').value
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentUser = data.user;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        initApp();
+      } else { alert(data.error); }
+    });
 
-io.on('connection', (socket) => {
-  socket.on('join', (prenom) => {
-    if (prenom) socket.join(prenom.trim().toLowerCase());
-  });
+    document.getElementById('register-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const user = {
+        prenom: document.getElementById('reg-prenom').value,
+        password: document.getElementById('reg-password').value,
+        age: document.getElementById('reg-age').value,
+        ville: document.getElementById('reg-ville').value,
+        genre: document.getElementById('reg-genre').value,
+        photo: document.getElementById('avatar-img').src
+      };
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentUser = data.user;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        initApp();
+      } else { alert(data.error); }
+    });
 
-  socket.on('send_message', ({ from, to, text }) => {
-    const data = { from, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-    io.to(to.trim().toLowerCase()).emit('receive_message', data);
-    io.to(from.trim().toLowerCase()).emit('receive_message', data);
-  });
-});
+    function initApp() {
+      if (!currentUser) return;
+      socket.emit('join', currentUser.prenom);
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+      updateQuota();
+      fetchProfiles();
+    }
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Serveur actif sur le port ${PORT}`);
-});
+    function updateQuota() {
+      const q = document.getElementById('quota-tag');
+      q.style.display = 'block';
+      q.textContent = (currentUser.genre === 'Femme' || currentUser.isPremium) ? 'Illimité ♾️' : `Likes : ${currentUser.likesLeft}/10`;
+    }
+
+    async function fetchProfiles() {
+      const res = await fetch('/api/profiles/' + currentUser.prenom);
+      profilesList = await res.json();
+      currentIdx = 0;
+      showCard();
+    }
+
+    function showCard() {
+      if (currentIdx >= profilesList.length) {
+        document.getElementById('target-title').textContent = "Plus de profils";
+        document.getElementById('target-loc').textContent = "Créez un autre compte dans un autre onglet pour tester !";
+        document.getElementById('target-img').src = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300";
+        document.getElementById('action-btns').style.display = 'none';
+        return;
+      }
+      document.getElementById('action-btns').style.display = 'flex';
+      const p = profilesList[currentIdx];
+      document.getElementById('target-img').src = p.photo;
+      document.getElementById('target-title').textContent = `${p.prenom}, ${p.age}`;
+      document.getElementById('target-loc').textContent = `📍 ${p.ville}`;
+    }
+
+    async function handleLike(isLike) {
+      if (!isLike) { currentIdx++; showCard(); return; }
+
+      const targetUser = profilesList[currentIdx];
+      const res = await fetch('/api/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: currentUser.prenom, to: targetUser.prenom })
+      });
+      const data = await res.json();
+
+      if (data.paywall) {
+        document.getElementById('app-screen').style.display = 'none';
+        document.getElementById('paywall-screen').style.display = 'block';
+        return;
+      }
+
+      if (data.success) {
+        currentUser.likesLeft = data.likesLeft;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        updateQuota();
+        if (data.isMatch) {
+          matches.push(targetUser);
+          document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
+          alert(`🎉 NOUVEAU MATCH avec ${targetUser.prenom} !`);
+        }
+      }
+      currentIdx++;
+      showCard();
+    }
+
+    async function startStripeCheckout() {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prenom: currentUser.prenom })
+      });
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.simulated) {
+        upgradeToPremiumSimulated();
+      }
+    }
+
+    async function upgradeToPremiumSimulated() {
+      const res = await fetch('/api/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prenom: currentUser.prenom })
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentUser = data.user;
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        updateQuota();
+        alert("Paiement validé ! Likes illimités débloqués.");
+        backToSwipe();
+      }
+    }
+
+    function backToSwipe() {
+      document.getElementById('paywall-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+    }
+
+    socket.on('match_notification', ({ withUser }) => {
+      matches.push(withUser);
+      document.getElementById('btn-matches-list').textContent = `💬 Messages (${matches.length})`;
+      alert(`🎉 C'EST UN MATCH ! ${withUser.prenom} vous a liké en retour !`);
+    });
+
+    function showChatList() {
+      if (matches.length === 0) { alert("Aucun match pour le moment !"); return; }
+      activeChatPartner = matches[0];
+      document.getElementById('app-screen').style.display = 'none';
+      document.getElementById('chat-screen').style.display = 'block';
+      document.getElementById('chat-with-name').textContent = `Discussion avec ${activeChatPartner.prenom}`;
+    }
+
+    function showSwipe() {
+      document.getElementById('chat-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text || !activeChatPartner) return;
+      socket.emit('send_message', { from: currentUser.prenom, to: activeChatPartner.prenom, text });
+      input.value = '';
+    }
+
+    socket.on('receive_message', (msg) => {
+      const box = document.getElementById('chat-box');
+      const div = document.createElement('div');
+      div.className = `msg ${msg.from.toLowerCase() === currentUser.prenom.toLowerCase() ? 'msg-me' : 'msg-them'}`;
+      div.textContent = `${msg.text} (${msg.time})`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    });
+
+    function logout() {
+      localStorage.removeItem('activeUser');
+      location.reload();
+    }
+
+    if (currentUser) {
+      initApp();
+    }
+  </script>
+</body>
+</html>
