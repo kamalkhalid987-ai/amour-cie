@@ -11,41 +11,62 @@ app.use(express.static('public'));
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-let users = {}; // Stocke les utilisateurs connectés
-let likes = {}; // Stocke qui a liké qui : { "prenom1": ["prenom2"] }
-let matches = [];
+let users = {}; // { id: { prenom, password, genre, ville, age, photo, likesLeft, isPremium } }
+let likes = {}; // { prenom: [destinataires] }
+let messages = {}; 
 
+// Inscription
 app.post('/api/register', (req, res) => {
-  const user = req.body;
-  if (!user.prenom) return res.status(400).json({ error: 'Prénom requis' });
+  const { prenom, password, age, ville, genre, photo } = req.body;
+  if (!prenom || !password) return res.status(400).json({ error: 'Identifiants requis' });
   
-  const key = user.prenom.trim().toLowerCase();
-  if (!users[key]) {
-    users[key] = {
-      ...user,
-      likesLeft: user.genre === 'Homme' ? 10 : Infinity,
-      isPremium: false
-    };
+  const key = prenom.trim().toLowerCase();
+  if (users[key]) {
+    return res.status(400).json({ error: 'Ce prénom existe déjà. Connectez-vous !' });
   }
+
+  users[key] = {
+    prenom: prenom.trim(),
+    password,
+    age,
+    ville,
+    genre,
+    photo,
+    likesLeft: genre === 'Homme' ? 10 : Infinity,
+    isPremium: false
+  };
   
   res.json({ success: true, user: users[key] });
 });
 
+// Connexion
+app.post('/api/login', (req, res) => {
+  const { prenom, password } = req.body;
+  const key = prenom.trim().toLowerCase();
+  
+  if (!users[key] || users[key].password !== password) {
+    return res.status(400).json({ error: 'Prénom ou mot de passe incorrect' });
+  }
+
+  res.json({ success: true, user: users[key] });
+});
+
+// Profils à swiper
 app.get('/api/profiles/:prenom', (req, res) => {
   const currentKey = req.params.prenom.trim().toLowerCase();
   const currentUser = users[currentKey];
   if (!currentUser) return res.json([]);
 
-  // Récupérer tous les autres utilisateurs inscrits
+  const userLikes = likes[currentKey] || [];
   const available = Object.values(users).filter(u => {
     const uKey = u.prenom.trim().toLowerCase();
-    const userLikes = likes[currentKey] || [];
     return uKey !== currentKey && !userLikes.includes(uKey);
   });
 
   res.json(available);
 });
 
+// Gestion des Likes & Quota Hommes
 app.post('/api/like', (req, res) => {
   const { from, to } = req.body;
   const fromKey = from.trim().toLowerCase();
@@ -54,10 +75,10 @@ app.post('/api/like', (req, res) => {
   const user = users[fromKey];
   if (!user) return res.status(400).json({ error: 'Utilisateur inconnu' });
 
-  // Quota pour les hommes
+  // Règle Tinder : Quota strict de 10 likes pour les hommes (sauf si premium)
   if (user.genre === 'Homme' && !user.isPremium) {
     if (user.likesLeft <= 0) {
-      return res.json({ success: false, paywall: true });
+      return res.json({ success: false, paywall: true, message: "Quota de 10 likes journaliers atteint." });
     }
     user.likesLeft--;
   }
@@ -67,7 +88,6 @@ app.post('/api/like', (req, res) => {
     likes[fromKey].push(toKey);
   }
 
-  // Vérifier si c'est un match (si l'autre a aussi liké 'from')
   let isMatch = false;
   const targetLikes = likes[toKey] || [];
   if (targetLikes.includes(fromKey)) {
@@ -78,6 +98,7 @@ app.post('/api/like', (req, res) => {
   res.json({ success: true, isMatch, likesLeft: user.likesLeft });
 });
 
+// Paiement / Pass Illimité pour dépasser les 10 likes
 app.post('/api/upgrade', (req, res) => {
   const { prenom } = req.body;
   const key = prenom.trim().toLowerCase();
