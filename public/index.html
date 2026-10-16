@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -68,12 +67,13 @@
     }
 
     .avatar-wrapper {
-      width: 90px;
-      height: 90px;
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
       overflow: hidden;
-      border: 3px solid #ff4d4d;
+      border: 3px solid #c85a38;
       margin-bottom: 12px;
+      background-color: #f0f0f0;
     }
 
     .avatar-wrapper img {
@@ -163,15 +163,20 @@
     .btn-submit:hover {
       background-color: #b04e30;
     }
+
+    #status-msg {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
 
   <div class="card">
     <div class="header">
-      <div class="logo">
-        🌷 Amour & Cie
-      </div>
+      <div class="logo">🌷 Amour & Cie</div>
       <span class="badge">Standard</span>
     </div>
 
@@ -181,25 +186,26 @@
       <div class="avatar-wrapper">
         <img id="avatar-preview" src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300&auto=format&fit=crop" alt="Photo de profil">
       </div>
-      <button class="btn-photo">🖼️ Choisir une photo</button>
+      <button class="btn-photo" onclick="document.getElementById('photo-input').click()">🖼️ Choisir une photo</button>
+      <input type="file" id="photo-input" accept="image/*" style="display: none;">
     </div>
 
-    <form>
+    <form id="profile-form">
       <div class="form-group">
         <label>Prénom</label>
-        <input type="text" placeholder="Votre prénom...">
+        <input type="text" id="prenom" placeholder="Votre prénom..." required>
       </div>
 
       <div class="row">
         <div class="form-group">
           <label>Âge</label>
-          <input type="number" placeholder="Ex: 25">
+          <input type="number" id="age" placeholder="Ex: 25" required>
         </div>
         <div class="form-group">
           <label>Ville / Localisation</label>
           <div style="display: flex; gap: 6px;">
-            <input type="text" placeholder="Votre ville">
-            <button type="button" class="btn-gps">📍 GPS</button>
+            <input type="text" id="ville" placeholder="Votre ville" required>
+            <button type="button" class="btn-gps" id="btn-gps">📍 GPS</button>
           </div>
         </div>
       </div>
@@ -207,28 +213,106 @@
       <div class="row">
         <div class="form-group">
           <label>Je suis :</label>
-          <select>
-            <option>Un Homme</option>
-            <option>Une Femme</option>
+          <select id="genre">
+            <option value="Homme">Un Homme</option>
+            <option value="Femme">Une Femme</option>
           </select>
         </div>
         <div class="form-group">
           <label>Je cherche :</label>
-          <select>
-            <option>Une Femme</option>
-            <option>Un Homme</option>
+          <select id="recherche">
+            <option value="Femme">Une Femme</option>
+            <option value="Homme">Un Homme</option>
           </select>
         </div>
       </div>
 
       <div class="form-group">
         <label>Bio / Description</label>
-        <textarea placeholder="Décrivez-vous en quelques mots..."></textarea>
+        <textarea id="bio" placeholder="Décrivez-vous en quelques mots..."></textarea>
       </div>
 
       <button type="submit" class="btn-submit">Rejoindre l'application</button>
+      <div id="status-msg"></div>
     </form>
   </div>
 
+  <script>
+    // 1. Gestion du chargement de photo
+    const photoInput = document.getElementById('photo-input');
+    const avatarPreview = document.getElementById('avatar-preview');
+
+    photoInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          avatarPreview.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // 2. Localisation GPS automatique
+    const btnGps = document.getElementById('btn-gps');
+    const villeInput = document.getElementById('ville');
+
+    btnGps.addEventListener('click', function() {
+      if ('geolocation' in navigator) {
+        btnGps.textContent = '⏳...';
+        navigator.geolocation.getCurrentPosition(
+          async function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            try {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+              const data = await res.json();
+              const ville = data.address.city || data.address.town || data.address.village || 'Position détectée';
+              villeInput.value = ville;
+              btnGps.textContent = '📍 GPS';
+            } catch (err) {
+              villeInput.value = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+              btnGps.textContent = '📍 GPS';
+            }
+          },
+          function(error) {
+            alert('Impossible de récupérer votre position GPS. Veuillez vérifier les autorisations de votre navigateur.');
+            btnGps.textContent = '📍 GPS';
+          }
+        );
+      } else {
+        alert('La géolocalisation n\'est pas supportée par votre navigateur.');
+      }
+    });
+
+    // 3. Soumission du formulaire et connexion
+    const form = document.getElementById('profile-form');
+    const statusMsg = document.getElementById('status-msg');
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const userProfile = {
+        prenom: document.getElementById('prenom').value,
+        age: document.getElementById('age').value,
+        ville: document.getElementById('ville').value,
+        genre: document.getElementById('genre').value,
+        recherche: document.getElementById('recherche').value,
+        bio: document.getElementById('bio').value,
+        photo: avatarPreview.src
+      };
+
+      // Sauvegarde du profil en mémoire locale
+      localStorage.setItem('userProfile', JSON.stringify(userProfile));
+
+      statusMsg.style.color = '#558b6e';
+      statusMsg.textContent = 'Connexion en cours... Profil créé avec succès !';
+
+      // Redirection après validation
+      setTimeout(() => {
+        alert('Bienvenue ' + userProfile.prenom + ' ! Vous êtes maintenant connecté à Amour & Cie.');
+      }, 500);
+    });
+  </script>
 </body>
 </html>
