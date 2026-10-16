@@ -3,154 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Amour & Cie - Application de Rencontre</title>
+  <title>Amour & Cie</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    body {
-      background-color: #e8e3dd;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-
-    .card {
-      background: #ffffff;
-      border-radius: 24px;
-      padding: 24px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-      position: relative;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .logo {
-      font-weight: 700;
-      font-size: 20px;
-      color: #c85a38;
-    }
-
-    .quota-badge {
-      font-size: 12px;
-      background: #f0f0f0;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-weight: 600;
-      color: #555;
-    }
-
-    /* Formulaire */
-    .avatar-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .avatar-wrapper {
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      overflow: hidden;
-      border: 3px solid #c85a38;
-      margin-bottom: 10px;
-    }
-
-    .avatar-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .btn-photo, .btn-gps {
-      background-color: #558b6e;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .form-group { margin-bottom: 14px; }
-    label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; }
-    input, select, textarea {
-      width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0;
-      border-radius: 10px; font-size: 14px; background: #fafafa;
-    }
-    .row { display: flex; gap: 10px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+    body { background-color: #e8e3dd; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+    .card { background: #ffffff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .logo { font-weight: 700; font-size: 20px; color: #c85a38; }
+    .badge { font-size: 12px; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-weight: 600; color: #555; }
+    
+    .avatar-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 18px; }
+    .avatar-wrapper { width: 100px; height: 100px; border-radius: 50%; overflow: hidden; border: 3px solid #c85a38; margin-bottom: 10px; cursor: pointer; background: #eee; }
+    .avatar-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+    
+    .btn-secondary { background-color: #558b6e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 600; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fafafa; }
+    .row { display: flex; gap: 8px; }
     .row .form-group { flex: 1; }
-
-    .btn-submit {
-      width: 100%; background-color: #c85a38; color: white;
-      border: none; padding: 14px; border-radius: 12px;
-      font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px;
-    }
-
-    /* Interface de Swipe (Tinder-like) */
-    #swipe-screen { display: none; text-align: center; }
-
-    .profile-card {
-      position: relative;
-      width: 100%;
-      height: 380px;
-      border-radius: 18px;
-      overflow: hidden;
-      margin-bottom: 20px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-
-    .profile-card img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .profile-info {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      background: linear-gradient(transparent, rgba(0,0,0,0.8));
-      color: white;
-      padding: 20px 16px;
-      text-align: left;
-    }
-
-    .profile-info h2 { font-size: 22px; }
-    .profile-info p { font-size: 13px; opacity: 0.9; }
-
-    .action-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-    }
-
-    .btn-action {
-      width: 60px; height: 60px;
-      border-radius: 50%; border: none;
-      font-size: 24px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-      transition: transform 0.2s;
-    }
-
-    .btn-action:active { transform: scale(0.9); }
-    .btn-dislike { background: #fff; color: #ff4d4d; }
-    .btn-like { background: #2b7a78; color: white; }
+    
+    .btn-main { width: 100%; background-color: #c85a38; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+    .btn-main:hover { background-color: #b04e30; }
+    
+    .nav-toggle { text-align: center; margin-top: 12px; font-size: 13px; color: #558b6e; cursor: pointer; text-decoration: underline; font-weight: 600; }
+    
+    /* Interface Swipe */
+    #app-screen { display: none; }
+    .profile-card { position: relative; width: 100%; height: 360px; border-radius: 16px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
+    .profile-card img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: white; padding: 15px; }
+    
+    .actions { display: flex; justify-content: center; gap: 20px; }
+    .btn-act { width: 55px; height: 55px; border-radius: 50%; border: none; font-size: 22px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+    .btn-no { background: #fff; color: #ff4d4d; }
+    .btn-yes { background: #2b7a78; color: white; }
+    .btn-logout { background: none; border: none; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; margin-top: 15px; width: 100%; text-align: center; }
   </style>
 </head>
 <body>
@@ -158,37 +46,48 @@
   <div class="card">
     <div class="header">
       <div class="logo">🌷 Amour & Cie</div>
-      <div id="quota-display" class="quota-badge" style="display: none;">Likes : Illimités</div>
+      <div id="quota-tag" class="badge" style="display:none;"></div>
     </div>
 
-    <!-- Écran 1 : Inscription -->
+    <!-- ÉCRAN CONNEXION / INSCRIPTION -->
     <div id="auth-screen">
-      <h1 style="text-align: center; font-size: 20px; color: #c85a38; margin-bottom: 16px;">Créer votre profil</h1>
+      <h2 id="auth-title" style="text-align:center; color:#c85a38; margin-bottom:15px; font-size:18px;">Connexion à votre compte</h2>
 
-      <div class="avatar-container">
-        <div class="avatar-wrapper">
-          <img id="avatar-preview" src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300&auto=format&fit=crop" alt="Photo">
+      <!-- Formulaire Connexion -->
+      <form id="login-form">
+        <div class="form-group">
+          <label>Votre Prénom</label>
+          <input type="text" id="login-prenom" placeholder="Saisissez votre prénom..." required>
         </div>
-        <button class="btn-photo" onclick="document.getElementById('photo-input').click()">🖼️ Choisir une photo</button>
-        <input type="file" id="photo-input" accept="image/*" style="display: none;">
-      </div>
+        <button type="submit" class="btn-main">Se connecter</button>
+        <div class="nav-toggle" onclick="toggleAuth(true)">Pas encore de compte ? S'inscrire</div>
+      </form>
 
-      <form id="profile-form">
+      <!-- Formulaire Inscription -->
+      <form id="register-form" style="display:none;">
+        <div class="avatar-container">
+          <div class="avatar-wrapper" onclick="document.getElementById('photo-file').click()">
+            <img id="avatar-img" src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=300" alt="Photo">
+          </div>
+          <button type="button" class="btn-secondary" onclick="document.getElementById('photo-file').click()">🖼️ Importer une photo</button>
+          <input type="file" id="photo-file" accept="image/*" style="display:none;">
+        </div>
+
         <div class="form-group">
           <label>Prénom</label>
-          <input type="text" id="prenom" placeholder="Votre prénom..." required>
+          <input type="text" id="reg-prenom" placeholder="Votre prénom..." required>
         </div>
 
         <div class="row">
           <div class="form-group">
             <label>Âge</label>
-            <input type="number" id="age" placeholder="Ex: 25" required>
+            <input type="number" id="reg-age" placeholder="Ex: 25" required>
           </div>
           <div class="form-group">
             <label>Ville</label>
-            <div style="display: flex; gap: 4px;">
-              <input type="text" id="ville" placeholder="Votre ville" required>
-              <button type="button" class="btn-gps" id="btn-gps">📍</button>
+            <div style="display:flex; gap:4px;">
+              <input type="text" id="reg-ville" placeholder="Ville" required>
+              <button type="button" class="btn-secondary" id="btn-gps">📍</button>
             </div>
           </div>
         </div>
@@ -196,111 +95,185 @@
         <div class="row">
           <div class="form-group">
             <label>Je suis :</label>
-            <select id="genre">
+            <select id="reg-genre">
               <option value="Homme">Un Homme</option>
               <option value="Femme">Une Femme</option>
             </select>
           </div>
           <div class="form-group">
             <label>Je cherche :</label>
-            <select id="recherche">
+            <select id="reg-recherche">
               <option value="Femme">Une Femme</option>
               <option value="Homme">Un Homme</option>
             </select>
           </div>
         </div>
 
-        <button type="submit" class="btn-submit">Lancer l'expérience</button>
+        <button type="submit" class="btn-main">Créer mon compte</button>
+        <div class="nav-toggle" onclick="toggleAuth(false)">Déjà inscrit ? Se connecter</div>
       </form>
     </div>
 
-    <!-- Écran 2 : Swipe / Like à la Tinder -->
-    <div id="swipe-screen">
+    <!-- ÉCRAN DE L'APPLICATION (SWIPE/LIKES) -->
+    <div id="app-screen">
       <div class="profile-card">
-        <img id="target-photo" src="" alt="Profil">
+        <img id="target-img" src="" alt="Photo">
         <div class="profile-info">
-          <h2 id="target-name">Sonia, 24</h2>
-          <p id="target-city">📍 Paris</p>
-          <p id="target-bio">Passionnée de voyages et de photographie. ✈️</p>
+          <h3 id="target-title">Sonia, 24</h3>
+          <p id="target-loc">📍 Paris</p>
         </div>
       </div>
 
-      <div class="action-buttons">
-        <button class="btn-action btn-dislike" onclick="handleSwipe(false)">❌</button>
-        <button class="btn-action btn-like" onclick="handleSwipe(true)">❤️</button>
+      <div class="actions">
+        <button class="btn-act btn-no" onclick="likeProfile(false)">❌</button>
+        <button class="btn-act btn-yes" onclick="likeProfile(true)">❤️</button>
       </div>
+
+      <button class="btn-logout" onclick="logout()">Se déconnecter</button>
     </div>
   </div>
 
   <script>
-    // Liste de profils simulés
-    const mockProfiles = [
-      { prenom: "Sonia", age: 24, ville: "Paris", bio: "Passionnée de voyages et de café. ☕", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600" },
-      { prenom: "Clara", age: 27, ville: "Lyon", bio: "Amoureuse de nature et de randonnées 🌿", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600" },
-      { prenom: "Elena", age: 23, ville: "Bordeaux", bio: "Architecte d'intérieur le jour, DJ la nuit 🎧", photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=600" },
-      { prenom: "Lucas", age: 26, ville: "Marseille", bio: "Sportif et passionné de cuisine italienne 🍝", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=600" }
+    let currentUser = JSON.parse(localStorage.getItem('activeUser')) || null;
+    let profiles = [
+      { name: "Sonia", age: 24, city: "Paris", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600" },
+      { name: "Clara", age: 27, city: "Lyon", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600" },
+      { name: "Elena", age: 23, city: "Bordeaux", photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=600" }
     ];
+    let currentIdx = 0;
 
-    let currentProfileIndex = 0;
-    let currentUser = null;
-    let likesRemaining = 10;
-
-    // Demande de permission de notification push
-    function requestNotificationPermission() {
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission();
-      }
-    }
-
-    // Affichage d'une notification Push sur le téléphone/navigateur
-    function sendPushNotification(title, body) {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, {
-          body: body,
-          icon: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=100'
-        });
-      }
-    }
-
-    // Chargement de photo
-    document.getElementById('photo-input').addEventListener('change', function(e) {
+    // Chargement dynamique de la photo de profil
+    document.getElementById('photo-file').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = function(event) {
-          document.getElementById('avatar-preview').src = event.target.result;
+        reader.onload = function(evt) {
+          document.getElementById('avatar-img').src = evt.target.result;
         };
         reader.readAsDataURL(file);
       }
     });
 
-    // Localisation GPS
+    // Géolocalisation GPS
     document.getElementById('btn-gps').addEventListener('click', function() {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(async (pos) => {
           try {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
             const data = await res.json();
-            document.getElementById('ville').value = data.address.city || data.address.town || 'Position détectée';
-          } catch(e) { document.getElementById('ville').value = "Paris"; }
-        });
+            document.getElementById('reg-ville').value = data.address.city || data.address.town || 'Paris';
+          } catch(e) { document.getElementById('reg-ville').value = 'Paris'; }
+        }, () => alert("Activez la géolocalisation sur votre appareil."));
       }
     });
 
-    // Validation Inscription
-    document.getElementById('profile-form').addEventListener('submit', function(e) {
+    // Basculer entre Connexion et Inscription
+    function toggleAuth(showRegister) {
+      document.getElementById('login-form').style.display = showRegister ? 'none' : 'block';
+      document.getElementById('register-form').style.display = showRegister ? 'block' : 'none';
+      document.getElementById('auth-title').textContent = showRegister ? 'Créer votre compte' : 'Connexion à votre compte';
+    }
+
+    // Gestion Inscription
+    document.getElementById('register-form').addEventListener('submit', function(e) {
       e.preventDefault();
-      
-      currentUser = {
-        prenom: document.getElementById('prenom').value,
-        genre: document.getElementById('genre').value,
+      const user = {
+        prenom: document.getElementById('reg-prenom').value,
+        age: document.getElementById('reg-age').value,
+        ville: document.getElementById('reg-ville').value,
+        genre: document.getElementById('reg-genre').value,
+        likesLeft: document.getElementById('reg-genre').value === 'Homme' ? 10 : Infinity,
+        photo: document.getElementById('avatar-img').src
       };
 
-      requestNotificationPermission();
+      // Sauvegarder dans la mémoire du navigateur
+      localStorage.setItem('user_' + user.prenom.toLowerCase(), JSON.stringify(user));
+      loginUser(user);
+    });
 
-      // Gestion de la règle de quota : Femme = Illimité, Homme = 10
-      const quotaDisplay = document.getElementById('quota-display');
-      quotaDisplay.style.display = 'block';
-      
+    // Gestion Connexion
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const prenom = document.getElementById('login-prenom').value.trim().toLowerCase();
+      const savedUser = localStorage.getItem('user_' + prenom);
+
+      if (savedUser) {
+        loginUser(JSON.parse(savedUser));
+      } else {
+        alert("Aucun compte trouvé avec ce prénom. Veuillez vous inscrire !");
+        toggleAuth(true);
+      }
+    });
+
+    function loginUser(user) {
+      currentUser = user;
+      localStorage.setItem('activeUser', JSON.stringify(user));
+
+      // Notifications push
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
+
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+
+      updateQuota();
+      showCard();
+    }
+
+    function updateQuota() {
+      const q = document.getElementById('quota-tag');
+      q.style.display = 'block';
       if (currentUser.genre === 'Femme') {
-        quotaDisplay.textContent = 'Likes : Illim
+        q.textContent = 'Likes : Illimités ♾️';
+      } else {
+        q.textContent = `Likes : ${currentUser.likesLeft}/10`;
+      }
+    }
+
+    function showCard() {
+      if (currentIdx >= profiles.length) {
+        alert("Plus de profils disponibles aux alentours.");
+        return;
+      }
+      const p = profiles[currentIdx];
+      document.getElementById('target-img').src = p.photo;
+      document.getElementById('target-title').textContent = `${p.name}, ${p.age}`;
+      document.getElementById('target-loc').textContent = `📍 ${p.city}`;
+    }
+
+    function likeProfile(isLike) {
+      if (isLike && currentUser.genre === 'Homme') {
+        if (currentUser.likesLeft <= 0) {
+          alert("Limite de 10 likes par jour atteinte !");
+          return;
+        }
+        currentUser.likesLeft--;
+        localStorage.setItem('user_' + currentUser.prenom.toLowerCase(), JSON.stringify(currentUser));
+        localStorage.setItem('activeUser', JSON.stringify(currentUser));
+        updateQuota();
+      }
+
+      if (isLike && Math.random() > 0.4) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification("Nouveau Match ! ❤️", { body: `${profiles[currentIdx].name} vous a également liké !` });
+        }
+        alert(`Match ! ❤️ Vous avez matché avec ${profiles[currentIdx].name}`);
+      }
+
+      currentIdx++;
+      showCard();
+    }
+
+    function logout() {
+      localStorage.removeItem('activeUser');
+      location.reload();
+    }
+
+    // Auto-connexion si déjà connecté
+    if (currentUser) {
+      loginUser(currentUser);
+    }
+  </script>
+</body>
+</html>
