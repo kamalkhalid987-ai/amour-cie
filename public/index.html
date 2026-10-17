@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amour & Cie - Rencontres</title>
     <script src="/socket.io/socket.io.js"></script>
-    <!-- Google Identity Services SDK pour la connexion Google -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --primary: #c95d43;
@@ -64,10 +62,11 @@
         }
 
         /* PHOTO PICKER */
-        .photo-picker-box { display: flex; flex-direction: column; align-items: center; margin: 2px 0; }
+        .photo-picker-box { display: flex; flex-direction: column; align-items: center; margin: 6px 0; }
         .photo-preview {
-            width: 70px; height: 70px; border-radius: 50%; background-size: cover;
-            background-position: center; border: 3px solid var(--primary); margin-bottom: 4px; background-color: #eee;
+            width: 85px; height: 85px; border-radius: 50%; background-size: cover;
+            background-position: center; border: 3px solid var(--primary); margin-bottom: 6px; background-color: #eee;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
         /* CARTE SWIPE */
@@ -100,7 +99,7 @@
         /* CHATBOX & APPELS */
         .chat-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .call-buttons { display: flex; gap: 6px; }
-        .btn-call { padding: 4px 8px; font-size: 11px; border-radius: 8px; border: none; cursor: pointer; color: white; font-weight: bold; }
+        .btn-call { padding: 5px 10px; font-size: 11px; border-radius: 8px; border: none; cursor: pointer; color: white; font-weight: bold; }
         .btn-audio-call { background: #3498db; }
         .btn-video-call { background: #9b59b6; }
 
@@ -150,39 +149,29 @@
 
             <!-- 1. VUE INSCRIPTION / CONNEXION -->
             <div id="view-auth" class="view-panel active">
-                <h3 style="text-align: center; margin-bottom: 6px; color: var(--primary); font-size: 16px;">Créer ou se connecter</h3>
-                
-                <!-- Bouton Connexion Google natif -->
-                <div style="display: flex; justify-content: center; margin-bottom: 8px;">
-                    <div id="g_id_onload"
-                         data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-                         data-callback="handleGoogleResponse"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin" data-type="standard" data-size="large" data-text="signin_with" data-shape="rectangular"></div>
-                </div>
-                <div style="text-align: center; font-size: 11px; color: #888; margin-bottom: 6px;">OU INSCRIPTION CLASSIQUE</div>
+                <h3 style="text-align: center; margin-bottom: 6px; color: var(--primary); font-size: 16px;">Créer votre compte</h3>
 
                 <div class="photo-picker-box">
-                    <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80');"></div>
+                    <!-- Photo de couple de qualité par défaut -->
+                    <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80');"></div>
                     <input type="file" id="gallery-file" accept="image/*" style="display: none;" onchange="chargerPhotoGalerie(event)">
-                    <button type="button" class="btn-green" style="padding: 5px 10px; font-size: 11px; width: auto;" onclick="document.getElementById('gallery-file').click()">🖼️ Choisir une photo</button>
+                    <button type="button" class="btn-green" style="padding: 5px 12px; font-size: 11px; width: auto;" onclick="document.getElementById('gallery-file').click()">🖼️ Choisir une photo</button>
                 </div>
 
                 <div class="form-group">
                     <label>Prénom</label>
-                    <input type="text" id="reg-name" value="Kamal">
+                    <input type="text" id="reg-name" placeholder="Votre prénom...">
                 </div>
 
                 <div style="display: flex; gap: 8px;">
                     <div class="form-group" style="flex: 1;">
                         <label>Âge</label>
-                        <input type="number" id="reg-age" value="62">
+                        <input type="number" id="reg-age" placeholder="Ex: 28">
                     </div>
                     <div class="form-group" style="flex: 2;">
-                        <label>Ville / Localisation</label>
+                        <label>Ville</label>
                         <div class="input-row">
-                            <input type="text" id="reg-city" value="Paris">
+                            <input type="text" id="reg-city" placeholder="Ex: Paris">
                             <button type="button" class="btn-gps" onclick="obtenirGeolocalisation()">📍 GPS</button>
                         </div>
                     </div>
@@ -207,10 +196,10 @@
 
                 <div class="form-group">
                     <label>Bio / Description</label>
-                    <textarea id="reg-bio" rows="1">J'aime les belles rencontres.</textarea>
+                    <textarea id="reg-bio" rows="2" placeholder="Écrivez quelques mots sur vous..."></textarea>
                 </div>
 
-                <button type="button" class="btn-main" style="margin-top: 4px; padding: 10px;" onclick="seConnecter()">Rejoindre l'application</button>
+                <button type="button" class="btn-main" style="margin-top: 6px; padding: 11px;" onclick="seConnecter()">Créer mon compte</button>
             </div>
 
             <!-- 2. VUE SWIPE -->
@@ -300,26 +289,10 @@
         const socket = io();
         let currentUser = "";
         let userGender = "homme";
-        let userPhotoBase64 = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80";
+        let userPhotoBase64 = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80";
         let isUserPremium = false;
         let allUsers = [];
         let currentProfileIndex = 0;
-
-        // --- GOOGLE LOGIN CALLBACK ---
-        function handleGoogleResponse(response) {
-            // Décodage basique du jeton JWT Google reçu
-            const base64Url = response.credential.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-            const googleUser = JSON.parse(jsonPayload);
-
-            document.getElementById("reg-name").value = googleUser.name;
-            if (googleUser.picture) {
-                userPhotoBase64 = googleUser.picture;
-                document.getElementById("reg-photo-preview").style.backgroundImage = `url('${userPhotoBase64}')`;
-            }
-            seConnecter();
-        }
 
         function chargerPhotoGalerie(event) {
             const file = event.target.files[0];
@@ -343,8 +316,8 @@
                         alert("📍 Position GPS détectée !");
                     },
                     (error) => {
-                        document.getElementById("reg-city").value = "Paris (GPS Actif)";
-                        alert("📍 Position GPS approximative configurée.");
+                        document.getElementById("reg-city").value = "Paris";
+                        alert("📍 Position GPS configurée sur Paris.");
                     }
                 );
             } else {
@@ -403,8 +376,8 @@
 
             currentUser = name;
             userGender = gender;
-            document.getElementById("user-display-name").innerText = `${name}, ${age} ans (${gender})`;
-            document.getElementById("user-city-view").innerText = city;
+            document.getElementById("user-display-name").innerText = `${name}, ${age || '25'} ans (${gender})`;
+            document.getElementById("user-city-view").innerText = city || 'Paris';
             document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
 
             if (gender === 'femme') {
@@ -521,7 +494,7 @@
 
         async function startCall(callType) {
             if (allUsers.length === 0) { alert("Aucun correspondant disponible pour l'appel."); return; }
-            const target = allUsers[0]; // Appel vers le premier profil de la liste active
+            const target = allUsers[0];
 
             document.getElementById('call-modal').style.display = 'flex';
             document.getElementById('call-status-text').innerText = `Appel de ${target.name}...`;
@@ -550,52 +523,4 @@
 
         socket.on('incoming_call', async (data) => {
             if (confirm(`📞 Appel entrant de ${data.callerName} (${data.callType}). Accepter ?`)) {
-                document.getElementById('call-modal').style.display = 'flex';
-                localStream = await navigator.mediaDevices.getUserMedia({ video: data.callType === 'video', audio: true });
-                document.getElementById('localVideo').srcObject = localStream;
-
-                peerConnection = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                peerConnection.ontrack = event => {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        socket.emit('ice_candidate', { targetName: data.callerName, candidate: event.candidate });
-                    }
-                };
-
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                socket.emit('make_answer', { targetName: data.callerName, answer });
-            }
-        });
-
-        socket.on('call_answered', async (data) => {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        });
-
-        socket.on('ice_candidate', async (data) => {
-            if (peerConnection) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
-        });
-
-        socket.on('call_ended', () => {
-            endCall(false);
-        });
-
-        function endCall(notify = true) {
-            if (notify && allUsers.length > 0) {
-                socket.emit('end_call', { targetName: allUsers[0].name });
-            }
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            if (peerConnection) peerConnection.close();
-            document.getElementById('call-modal').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
+                document.getElementById('call-modal').style
