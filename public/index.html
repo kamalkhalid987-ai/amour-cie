@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amour & Cie - Rencontres</title>
+    <title>Amour & Cie - Rencontres & Appels</title>
+    
+    <!-- Scripts Externes : Socket.io, Leaflet JS & CSS, Google Auth -->
     <script src="/socket.io/socket.io.js"></script>
-    <!-- Google Identity Services SDK -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <style>
         :root {
             --primary: #c95d43;
@@ -14,15 +18,15 @@
             --secondary: #2d2a29;
             --bg-color: #e5ded6;
             --card-bg: #ffffff;
-            --green-btn: #4e7361;
-            --danger-btn: #d9534f;
+            --green-btn: #27ae60;
+            --danger-btn: #e74c3c;
             --gold: #f39c12;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
         body {
-            background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1600') no-repeat center center fixed;
+            background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1600') no-repeat center center fixed;
             background-size: cover;
             display: flex; justify-content: center; align-items: center;
             min-height: 100vh; padding: 10px; color: var(--secondary);
@@ -30,76 +34,70 @@
 
         .app-container {
             width: 100%; max-width: 420px; height: 740px;
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
-            border-radius: 28px; box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(12px);
+            border-radius: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);
             display: flex; flex-direction: column; overflow: hidden; position: relative;
         }
 
-        /* Screen Views */
+        /* Screens */
         .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
         .screen.active { display: flex; }
 
         /* Auth Screen */
-        #auth-screen { justify-content: center; align-items: center; padding: 30px; text-align: center; }
-        #auth-screen h1 { color: var(--primary); font-size: 2.3rem; margin-bottom: 5px; font-weight: 800; }
-        #auth-screen p { color: #555; margin-bottom: 25px; font-size: 0.95rem; }
+        #auth-screen { justify-content: center; align-items: center; padding: 25px; text-align: center; overflow-y: auto; }
+        #auth-screen h1 { color: var(--primary); font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; }
+        #auth-screen p { color: #555; margin-bottom: 20px; font-size: 0.9rem; }
 
-        .auth-box { width: 100%; display: flex; flex-direction: column; gap: 15px; }
+        .auth-box { width: 100%; display: flex; flex-direction: column; gap: 12px; }
         .form-group { text-align: left; }
-        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: #444; }
+        .form-group label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #444; }
         .form-group input, .form-group select {
-            width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 12px; font-size: 1rem; outline: none; background: #fff;
+            width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 12px; font-size: 0.95rem; outline: none; background: #fff;
         }
 
         .btn-main {
-            background: var(--primary); color: white; border: none; padding: 14px;
+            background: var(--primary); color: white; border: none; padding: 12px;
             border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: 0.2s; width: 100%;
         }
         .btn-main:hover { background: var(--primary-hover); }
 
-        .divider {
-            display: flex; align-items: center; text-align: center; color: #888; font-size: 0.85rem; margin: 10px 0;
+        .photo-preview {
+            width: 80px; height: 80px; border-radius: 50%; object-fit: cover;
+            margin: 5px auto; border: 2px dashed var(--primary); display: none;
         }
-        .divider::before, .divider::after {
-            content: ''; flex: 1; border-bottom: 1px solid #ddd;
-        }
-        .divider::before { margin-right: .5em; }
-        .divider::after { margin-left: .5em; }
 
-        /* Header Nav */
+        /* Header */
         .header {
             height: 60px; border-bottom: 1px solid #eee; display: flex;
             justify-content: space-between; align-items: center; padding: 0 20px; background: #fff;
         }
         .header .logo { font-weight: 800; color: var(--primary); font-size: 1.3rem; }
-        .header-actions { display: flex; gap: 8px; align-items: center; }
 
-        /* Main Content Scrollable Area */
-        .main-content { flex: 1; overflow-y: auto; padding: 15px; position: relative; }
+        /* Main Content */
+        .main-content { flex: 1; overflow-y: auto; padding: 12px; position: relative; }
 
-        /* Swiper Cards */
-        .card-stack { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        /* Map */
+        #map { width: 100%; height: 180px; border-radius: 16px; margin-bottom: 12px; border: 1px solid #ddd; }
+
+        /* Swipe Cards */
+        .card-stack { position: relative; width: 100%; height: 380px; display: flex; justify-content: center; align-items: center; }
         .user-card {
             position: absolute; width: 100%; height: 100%; background: #fff;
-            border-radius: 20px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-radius: 20px; border: 1px solid #eee; box-shadow: 0 6px 16px rgba(0,0,0,0.08);
             display: flex; flex-direction: column; overflow: hidden;
         }
-        .user-card img { width: 100%; height: 65%; object-fit: cover; }
-        .user-card-info { padding: 15px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-        .user-card-info h3 { font-size: 1.4rem; font-weight: 700; }
-        .user-card-info p { color: #666; font-size: 0.9rem; }
+        .user-card img { width: 100%; height: 70%; object-fit: cover; }
+        .user-card-info { padding: 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
 
         /* Controls */
         .card-controls {
-            position: absolute; bottom: 20px; left: 0; right: 0;
-            display: flex; justify-content: center; gap: 25px; z-index: 10;
+            display: flex; justify-content: center; gap: 20px; margin-top: 10px;
         }
         .control-btn {
-            width: 60px; height: 60px; border-radius: 50%; border: none;
+            width: 55px; height: 55px; border-radius: 50%; border: none;
             display: flex; justify-content: center; align-items: center;
-            font-size: 1.5rem; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.15); transition: transform 0.2s; background: #fff;
+            font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: 0.2s; background: #fff;
         }
-        .control-btn:active { transform: scale(0.9); }
         .btn-dislike { color: var(--danger-btn); }
         .btn-like { color: var(--primary); }
 
@@ -110,39 +108,49 @@
         .nav-item { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #888; }
         .nav-item.active { color: var(--primary); }
 
-        /* Chat Screen */
+        /* Chat & Calls */
         .chat-list { display: flex; flex-direction: column; gap: 10px; }
         .chat-item {
-            display: flex; align-items: center; gap: 12px; padding: 10px;
-            border-radius: 12px; cursor: pointer; background: #f9f9f9;
+            display: flex; align-items: center; justify-content: space-between; padding: 10px;
+            border-radius: 12px; background: #f9f9f9; cursor: pointer;
         }
-        .chat-avatar { width: 50px; height: 50px; border-radius: 50%; background: #ccc; object-fit: cover; }
+        .chat-user-info { display: flex; align-items: center; gap: 10px; }
+        .chat-avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
 
-        .chat-box { display: flex; flex-direction: column; height: 100%; }
         .messages-container { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; }
-        .message { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 0.95rem; }
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; }
         .message.sent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
-        .message.received { align-self: flex-start; background: #f0f0f0; color: #333; border-bottom-left-radius: 4px; }
+        .message.received { align-self: flex-start; background: #eef0f2; color: #333; border-bottom-left-radius: 4px; }
 
-        .chat-input-area { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; align-items: center; background: #fff; }
+        .chat-input-area { display: flex; gap: 6px; padding: 10px; border-top: 1px solid #eee; align-items: center; background: #fff; }
         .chat-input-area input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+
+        /* WebRTC Video Overlay */
+        #video-call-overlay {
+            display: none; position: absolute; top:0; left:0; width:100%; height:100%;
+            background: #000; z-index: 200; flex-direction: column; justify-content: space-between; padding: 20px;
+        }
+        #video-call-overlay.active { display: flex; }
+        video#remote-video { width: 100%; height: 75%; object-fit: cover; border-radius: 16px; background: #222; }
+        video#local-video { width: 90px; height: 120px; object-fit: cover; border-radius: 12px; position: absolute; top: 30px; right: 30px; border: 2px solid white; }
+        .call-controls { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
+        .btn-call-end { background: var(--danger-btn); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; cursor: pointer; }
 
         /* Paywall Modal */
         .modal {
             display: none; position: absolute; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; padding: 20px;
+            background: rgba(0,0,0,0.75); z-index: 100; justify-content: center; align-items: center; padding: 20px;
         }
         .modal.active { display: flex; }
         .modal-content {
-            background: #fff; border-radius: 20px; padding: 25px; text-align: center; width: 100%; max-width: 340px;
+            background: #fff; border-radius: 24px; padding: 25px; text-align: center; width: 100%; max-width: 330px;
         }
-        .modal-content h2 { color: var(--gold); margin-bottom: 10px; }
-        .modal-content p { color: #555; font-size: 0.95rem; margin-bottom: 20px; }
+        .modal-content h2 { color: var(--gold); margin-bottom: 10px; font-size: 1.3rem; }
+        .modal-content p { color: #555; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.4; }
         .btn-stripe {
             background: var(--gold); color: white; text-decoration: none; display: block;
             padding: 12px; border-radius: 12px; font-weight: 700; transition: 0.2s;
         }
-        .btn-stripe:hover { background: #d8870e; }
     </style>
 </head>
 <body>
@@ -152,39 +160,36 @@
     <!-- AUTH SCREEN -->
     <div id="auth-screen" class="screen active">
         <h1>Amour & Cie</h1>
-        <p>Trouvez l'amour et rencontrez des célibataires près de chez vous</p>
+        <p>Inscrivez-vous pour rencontrer des célibataires autour de vous</p>
 
         <div class="auth-box">
             <div class="form-group">
-                <label>Votre Prénom</label>
-                <input type="text" id="user-name" placeholder="Ex: Thomas">
+                <label>Prénom</label>
+                <input type="text" id="user-name" placeholder="Votre prénom">
             </div>
             <div class="form-group">
-                <label>Votre Genre</label>
+                <label>Genre</label>
                 <select id="user-gender">
                     <option value="homme">Homme</option>
                     <option value="femme">Femme</option>
                 </select>
             </div>
-            <button class="btn-main" onclick="registerUser()">Commencer l'aventure</button>
+            <div class="form-group">
+                <label>Photo de profil</label>
+                <input type="file" id="user-photo-file" accept="image/*" onchange="previewPhoto(event)">
+                <img id="photo-preview-img" class="photo-preview" alt="Aperçu">
+            </div>
 
-            <div class="divider">ou</div>
+            <button class="btn-main" onclick="registerUser()">Créer mon compte</button>
 
-            <!-- Google Sign-In Button Container -->
+            <div style="margin: 10px 0; color:#888; font-size: 0.8rem;">ou</div>
+
+            <!-- Connexion Google -->
             <div id="g_id_onload"
-                 data-client_id="YOUR_GOOGLE_CLIENT_ID"
-                 data-callback="handleCredentialResponse"
-                 data-auto_prompt="false">
+                 data-client_id="VOTRE_CLIENT_ID_GOOGLE_ICI"
+                 data-callback="handleCredentialResponse">
             </div>
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-size="large"
-                 data-theme="outline"
-                 data-text="sign_in_with"
-                 data-shape="rectangular"
-                 data-logo_alignment="left"
-                 style="width: 100%; display: flex; justify-content: center;">
-            </div>
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" style="display:flex; justify-content:center;"></div>
         </div>
     </div>
 
@@ -192,42 +197,43 @@
     <div id="app-screen" class="screen">
         <div class="header">
             <div class="logo">Amour & Cie</div>
-            <div class="header-actions">
-                <span id="user-status" style="font-size: 0.75rem; background: #f0f0f0; padding: 5px 10px; border-radius: 12px; font-weight: 600;">Compte Gratuit</span>
-            </div>
+            <span id="user-status" style="font-size: 0.75rem; background: #eee; padding: 4px 8px; border-radius: 10px;">Gratuit</span>
         </div>
 
-        <!-- DISCOVERY VIEW (SWIPE & GPS) -->
+        <!-- DISCOVERY / MAP / SWIPE -->
         <div id="view-swipe" class="main-content" style="display: block;">
-            <div id="gps-status" style="font-size: 0.8rem; color: #666; margin-bottom: 10px; text-align: center;">📍 Recherche de votre position GPS...</div>
-            <div class="card-stack" id="card-stack">
-                <!-- Profiles dynamically loaded -->
-            </div>
+            <div id="map"></div>
+            <div class="card-stack" id="card-stack"></div>
             <div class="card-controls">
                 <button class="control-btn btn-dislike" onclick="handleSwipe(false)">✕</button>
                 <button class="control-btn btn-like" onclick="handleSwipe(true)">♥</button>
             </div>
         </div>
 
-        <!-- CHAT LIST VIEW -->
+        <!-- CHATS LIST -->
         <div id="view-chats" class="main-content" style="display: none;">
             <h3>Vos Conversations</h3>
-            <div class="chat-list" id="chat-list" style="margin-top: 15px;">
-                <!-- Chats dynamically loaded -->
-            </div>
+            <div class="chat-list" id="chat-list" style="margin-top: 12px;"></div>
         </div>
 
-        <!-- ACTIVE CHAT ROOM -->
+        <!-- CHAT ROOM -->
         <div id="view-chat-room" class="main-content" style="display: none; height: 100%; padding:0;">
-            <div class="chat-box">
-                <div style="padding: 12px; border-bottom: 1px solid #eee; display:flex; align-items:center; gap:10px; background:#fff;">
-                    <button onclick="showView('chats')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">←</button>
-                    <h4 id="chat-target-name">Discussion</h4>
+            <div style="display:flex; flex-direction:column; height:100%;">
+                <div style="padding: 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:#fff;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button onclick="showView('chats')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">←</button>
+                        <h4 id="chat-target-name">Discussion</h4>
+                    </div>
+                    <div>
+                        <button onclick="startCall(false)" style="background:none; border:none; font-size:1.2rem; cursor:pointer; margin-right:8px;">📞</button>
+                        <button onclick="startCall(true)" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">📹</button>
+                    </div>
                 </div>
                 <div class="messages-container" id="messages-container"></div>
                 <div class="chat-input-area">
-                    <input type="text" id="chat-input" placeholder="Écrivez votre message...">
-                    <button class="btn-main" style="width: auto; padding: 10px 15px;" onclick="sendMessage()">Envoyer</button>
+                    <button id="btn-voice" onclick="toggleVoiceRecord()" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">🎙️</button>
+                    <input type="text" id="chat-input" placeholder="Écrivez un message...">
+                    <button class="btn-main" style="width:auto; padding:8px 12px;" onclick="sendMessage()">Envoyer</button>
                 </div>
             </div>
         </div>
@@ -239,13 +245,22 @@
         </div>
     </div>
 
+    <!-- WEBRTC CALL OVERLAY -->
+    <div id="video-call-overlay">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+        <div class="call-controls">
+            <button class="btn-call-end" onclick="endCall()">Raccrocher</button>
+        </div>
+    </div>
+
     <!-- PAYWALL MODAL -->
     <div id="paywall-modal" class="modal">
         <div class="modal-content">
             <h2>Limite de Likes atteinte !</h2>
-            <p>Les hommes disposent de 10 likes gratuits par jour. Passez à la version Premium pour profiter d'un accès illimité !</p>
+            <p>Les hommes disposent de 10 likes gratuits par jour. Passez à la version Premium pour débloquer des likes illimités !</p>
             <a href="https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000" class="btn-stripe">Passer Premium - 9,99 €/mois</a>
-            <button onclick="closePaywall()" style="background:none; border:none; margin-top:15px; color:#888; cursor:pointer;">Plus tard</button>
+            <button onclick="closePaywall()" style="background:none; border:none; margin-top:12px; color:#888; cursor:pointer;">Plus tard</button>
         </div>
     </div>
 
@@ -253,161 +268,17 @@
 
 <script>
     const STRIPE_PREMIUM_LINK = "https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000";
+    const socket = io();
 
     let currentUser = {
         name: "",
         gender: "homme",
+        photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
         isPremium: false,
         dailyLikes: 0,
-        location: null
+        lat: 48.8566,
+        lng: 2.3522
     };
 
-    const mockProfiles = [
-        { id: 1, name: "Sophie, 24 ans", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600" },
-        { id: 2, name: "Camille, 26 ans", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600" },
-        { id: 3, name: "Élodie, 23 ans", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600" },
-        { id: 4, name: "Emma, 25 ans", img: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600" }
-    ];
-
-    let currentProfileIndex = 0;
-
-    // Initialisation GPS
-    function initGPS() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    currentUser.location = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    document.getElementById('gps-status').textContent = "📍 Position GPS détectée à proximité";
-                },
-                (error) => {
-                    document.getElementById('gps-status').textContent = "📍 Localisation approximative activée";
-                }
-            );
-        }
-    }
-
-    function registerUser() {
-        const nameInput = document.getElementById('user-name').value;
-        const genderInput = document.getElementById('user-gender').value;
-
-        if (!nameInput.trim()) {
-            alert("Veuillez entrer votre prénom.");
-            return;
-        }
-
-        currentUser.name = nameInput;
-        currentUser.gender = genderInput;
-
-        finishLogin();
-    }
-
-    function handleCredentialResponse(response) {
-        // Décodage basique du JWT Google pour récupérer le nom si connexion Google
-        try {
-            const base64Url = response.credential.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            const googleUser = JSON.parse(jsonPayload);
-
-            currentUser.name = googleUser.name;
-            currentUser.gender = "homme"; // Par défaut
-            finishLogin();
-        } catch (e) {
-            alert("Erreur lors de la connexion Google.");
-        }
-    }
-
-    function finishLogin() {
-        // Charger le compteur de likes depuis le stockage local
-        const savedLikes = localStorage.getItem('dailyLikes_' + currentUser.name);
-        if (savedLikes) {
-            currentUser.dailyLikes = parseInt(savedLikes, 10);
-        }
-
-        document.getElementById('auth-screen').classList.remove('active');
-        document.getElementById('app-screen').classList.add('active');
-
-        initGPS();
-        loadCurrentCard();
-    }
-
-    function loadCurrentCard() {
-        const stack = document.getElementById('card-stack');
-        stack.innerHTML = "";
-
-        if (currentProfileIndex >= mockProfiles.length) {
-            stack.innerHTML = "<p style='color:#666; text-align:center;'>Plus de profils disponibles autour de vous ! Revenez plus tard.</p>";
-            return;
-        }
-
-        const profile = mockProfiles[currentProfileIndex];
-        const card = document.createElement('div');
-        card.className = "user-card";
-        card.innerHTML = `
-            <img src="${profile.img}" alt="${profile.name}">
-            <div class="user-card-info">
-                <h3>${profile.name}</h3>
-                <p>À moins de 5 km de votre position</p>
-            </div>
-        `;
-        stack.appendChild(card);
-    }
-
-    function handleSwipe(isLike) {
-        if (isLike) {
-            // Restriction Stripe pour les hommes au-delà de 10 likes
-            if (currentUser.gender === 'homme' && !currentUser.isPremium) {
-                if (currentUser.dailyLikes >= 10) {
-                    showPaywall();
-                    return;
-                }
-                currentUser.dailyLikes++;
-                localStorage.setItem('dailyLikes_' + currentUser.name, currentUser.dailyLikes);
-            }
-        }
-
-        currentProfileIndex++;
-        loadCurrentCard();
-    }
-
-    function showPaywall() {
-        document.getElementById('paywall-modal').classList.add('active');
-    }
-
-    function closePaywall() {
-        document.getElementById('paywall-modal').classList.remove('active');
-    }
-
-    function showView(viewName) {
-        document.getElementById('view-swipe').style.display = viewName === 'swipe' ? 'block' : 'none';
-        document.getElementById('view-chats').style.display = viewName === 'chats' ? 'block' : 'none';
-        document.getElementById('view-chat-room').style.display = viewName === 'chat-room' ? 'block' : 'none';
-
-        const navBtns = document.querySelectorAll('.footer-nav .nav-item');
-        navBtns[0].classList.toggle('active', viewName === 'swipe');
-        navBtns[1].classList.toggle('active', viewName === 'chats' || viewName === 'chat-room');
-    }
-
-    function sendMessage() {
-        const input = document.getElementById('chat-input');
-        const text = input.value.trim();
-        if (!text) return;
-
-        const container = document.getElementById('messages-container');
-        const msgDiv = document.createElement('div');
-        msgDiv.className = "message sent";
-        msgDiv.textContent = text;
-        container.appendChild(msgDiv);
-
-        input.value = "";
-        container.scrollTop = container.scrollHeight;
-    }
-</script>
-
-</body>
-</html>
+    let map, userMarker;
+    let isRecording = false, media
