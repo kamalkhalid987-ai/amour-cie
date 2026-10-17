@@ -22,15 +22,16 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
         body {
-            background-color: var(--bg-color);
+            background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1600') no-repeat center center fixed;
+            background-size: cover;
             display: flex; justify-content: center; align-items: center;
             min-height: 100vh; padding: 10px; color: var(--secondary);
         }
 
         .app-container {
             width: 100%; max-width: 420px; height: 740px;
-            background: var(--card-bg); border-radius: 28px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            border-radius: 28px; box-shadow: 0 15px 35px rgba(0,0,0,0.3);
             display: flex; flex-direction: column; overflow: hidden; position: relative;
         }
 
@@ -40,14 +41,14 @@
 
         /* Auth Screen */
         #auth-screen { justify-content: center; align-items: center; padding: 30px; text-align: center; }
-        #auth-screen h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 8px; font-weight: 800; }
-        #auth-screen p { color: #666; margin-bottom: 30px; font-size: 0.95rem; }
+        #auth-screen h1 { color: var(--primary); font-size: 2.3rem; margin-bottom: 5px; font-weight: 800; }
+        #auth-screen p { color: #555; margin-bottom: 25px; font-size: 0.95rem; }
 
         .auth-box { width: 100%; display: flex; flex-direction: column; gap: 15px; }
         .form-group { text-align: left; }
         .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: #444; }
         .form-group input, .form-group select {
-            width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 12px; font-size: 1rem; outline: none;
+            width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 12px; font-size: 1rem; outline: none; background: #fff;
         }
 
         .btn-main {
@@ -56,18 +57,27 @@
         }
         .btn-main:hover { background: var(--primary-hover); }
 
+        .divider {
+            display: flex; align-items: center; text-align: center; color: #888; font-size: 0.85rem; margin: 10px 0;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; border-bottom: 1px solid #ddd;
+        }
+        .divider::before { margin-right: .5em; }
+        .divider::after { margin-left: .5em; }
+
         /* Header Nav */
         .header {
             height: 60px; border-bottom: 1px solid #eee; display: flex;
-            justify-content: space-between; align-items: center; padding: 0 20px;
+            justify-content: space-between; align-items: center; padding: 0 20px; background: #fff;
         }
         .header .logo { font-weight: 800; color: var(--primary); font-size: 1.3rem; }
-        .header-actions { display: flex; gap: 12px; align-items: center; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
 
         /* Main Content Scrollable Area */
         .main-content { flex: 1; overflow-y: auto; padding: 15px; position: relative; }
 
-        /* Swiper / Cards */
+        /* Swiper Cards */
         .card-stack { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
         .user-card {
             position: absolute; width: 100%; height: 100%; background: #fff;
@@ -87,11 +97,11 @@
         .control-btn {
             width: 60px; height: 60px; border-radius: 50%; border: none;
             display: flex; justify-content: center; align-items: center;
-            font-size: 1.5rem; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.15); transition: transform 0.2s;
+            font-size: 1.5rem; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.15); transition: transform 0.2s; background: #fff;
         }
         .control-btn:active { transform: scale(0.9); }
-        .btn-dislike { background: #fff; color: var(--danger-btn); }
-        .btn-like { background: var(--primary); color: #fff; }
+        .btn-dislike { color: var(--danger-btn); }
+        .btn-like { color: var(--primary); }
 
         /* Footer Nav */
         .footer-nav {
@@ -114,7 +124,7 @@
         .message.sent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
         .message.received { align-self: flex-start; background: #f0f0f0; color: #333; border-bottom-left-radius: 4px; }
 
-        .chat-input-area { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; align-items: center; }
+        .chat-input-area { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; align-items: center; background: #fff; }
         .chat-input-area input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
 
         /* Paywall Modal */
@@ -142,7 +152,7 @@
     <!-- AUTH SCREEN -->
     <div id="auth-screen" class="screen active">
         <h1>Amour & Cie</h1>
-        <p>Trouvez l'amour en toute simplicité</p>
+        <p>Trouvez l'amour et rencontrez des célibataires près de chez vous</p>
 
         <div class="auth-box">
             <div class="form-group">
@@ -156,7 +166,25 @@
                     <option value="femme">Femme</option>
                 </select>
             </div>
-            <button class="btn-main" onclick="registerUser()">Commencer</button>
+            <button class="btn-main" onclick="registerUser()">Commencer l'aventure</button>
+
+            <div class="divider">ou</div>
+
+            <!-- Google Sign-In Button Container -->
+            <div id="g_id_onload"
+                 data-client_id="YOUR_GOOGLE_CLIENT_ID"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-size="large"
+                 data-theme="outline"
+                 data-text="sign_in_with"
+                 data-shape="rectangular"
+                 data-logo_alignment="left"
+                 style="width: 100%; display: flex; justify-content: center;">
+            </div>
         </div>
     </div>
 
@@ -165,12 +193,13 @@
         <div class="header">
             <div class="logo">Amour & Cie</div>
             <div class="header-actions">
-                <span id="user-status" style="font-size: 0.8rem; background: #eee; padding: 4px 8px; border-radius: 10px;">Gratuit</span>
+                <span id="user-status" style="font-size: 0.75rem; background: #f0f0f0; padding: 5px 10px; border-radius: 12px; font-weight: 600;">Compte Gratuit</span>
             </div>
         </div>
 
-        <!-- DISCOVERY VIEW -->
+        <!-- DISCOVERY VIEW (SWIPE & GPS) -->
         <div id="view-swipe" class="main-content" style="display: block;">
+            <div id="gps-status" style="font-size: 0.8rem; color: #666; margin-bottom: 10px; text-align: center;">📍 Recherche de votre position GPS...</div>
             <div class="card-stack" id="card-stack">
                 <!-- Profiles dynamically loaded -->
             </div>
@@ -188,10 +217,10 @@
             </div>
         </div>
 
-        <!-- ACTIVE CHAT VIEW -->
+        <!-- ACTIVE CHAT ROOM -->
         <div id="view-chat-room" class="main-content" style="display: none; height: 100%; padding:0;">
             <div class="chat-box">
-                <div style="padding: 10px; border-bottom: 1px solid #eee; display:flex; align-items:center; gap:10px;">
+                <div style="padding: 12px; border-bottom: 1px solid #eee; display:flex; align-items:center; gap:10px; background:#fff;">
                     <button onclick="showView('chats')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">←</button>
                     <h4 id="chat-target-name">Discussion</h4>
                 </div>
@@ -214,7 +243,7 @@
     <div id="paywall-modal" class="modal">
         <div class="modal-content">
             <h2>Limite de Likes atteinte !</h2>
-            <p>Les hommes ont droit à 10 likes gratuits par jour. Passez à la version Premium pour profiter de likes illimités !</p>
+            <p>Les hommes disposent de 10 likes gratuits par jour. Passez à la version Premium pour profiter d'un accès illimité !</p>
             <a href="https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000" class="btn-stripe">Passer Premium - 9,99 €/mois</a>
             <button onclick="closePaywall()" style="background:none; border:none; margin-top:15px; color:#888; cursor:pointer;">Plus tard</button>
         </div>
@@ -229,17 +258,36 @@
         name: "",
         gender: "homme",
         isPremium: false,
-        dailyLikes: 0
+        dailyLikes: 0,
+        location: null
     };
 
     const mockProfiles = [
-        { id: 1, name: "Sophie, 24 ans", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400" },
-        { id: 2, name: "Camille, 26 ans", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400" },
-        { id: 3, name: "Élodie, 23 ans", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400" },
-        { id: 4, name: "Emma, 25 ans", img: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400" }
+        { id: 1, name: "Sophie, 24 ans", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600" },
+        { id: 2, name: "Camille, 26 ans", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600" },
+        { id: 3, name: "Élodie, 23 ans", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600" },
+        { id: 4, name: "Emma, 25 ans", img: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600" }
     ];
 
     let currentProfileIndex = 0;
+
+    // Initialisation GPS
+    function initGPS() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    currentUser.location = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    document.getElementById('gps-status').textContent = "📍 Position GPS détectée à proximité";
+                },
+                (error) => {
+                    document.getElementById('gps-status').textContent = "📍 Localisation approximative activée";
+                }
+            );
+        }
+    }
 
     function registerUser() {
         const nameInput = document.getElementById('user-name').value;
@@ -253,7 +301,29 @@
         currentUser.name = nameInput;
         currentUser.gender = genderInput;
 
-        // Charger le nombre de likes depuis le stockage local
+        finishLogin();
+    }
+
+    function handleCredentialResponse(response) {
+        // Décodage basique du JWT Google pour récupérer le nom si connexion Google
+        try {
+            const base64Url = response.credential.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            const googleUser = JSON.parse(jsonPayload);
+
+            currentUser.name = googleUser.name;
+            currentUser.gender = "homme"; // Par défaut
+            finishLogin();
+        } catch (e) {
+            alert("Erreur lors de la connexion Google.");
+        }
+    }
+
+    function finishLogin() {
+        // Charger le compteur de likes depuis le stockage local
         const savedLikes = localStorage.getItem('dailyLikes_' + currentUser.name);
         if (savedLikes) {
             currentUser.dailyLikes = parseInt(savedLikes, 10);
@@ -262,6 +332,7 @@
         document.getElementById('auth-screen').classList.remove('active');
         document.getElementById('app-screen').classList.add('active');
 
+        initGPS();
         loadCurrentCard();
     }
 
@@ -270,7 +341,7 @@
         stack.innerHTML = "";
 
         if (currentProfileIndex >= mockProfiles.length) {
-            stack.innerHTML = "<p style='color:#888;'>Plus de profils disponibles autour de vous !</p>";
+            stack.innerHTML = "<p style='color:#666; text-align:center;'>Plus de profils disponibles autour de vous ! Revenez plus tard.</p>";
             return;
         }
 
@@ -281,7 +352,7 @@
             <img src="${profile.img}" alt="${profile.name}">
             <div class="user-card-info">
                 <h3>${profile.name}</h3>
-                <p>À moins de 10 km de chez vous</p>
+                <p>À moins de 5 km de votre position</p>
             </div>
         `;
         stack.appendChild(card);
