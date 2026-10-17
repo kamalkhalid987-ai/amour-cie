@@ -460,6 +460,16 @@
         }
 
         function swiperProfil(isLiked) {
+            // Vérification de la limite de 10 likes pour les hommes
+    if (isLike) {
+        if (!window.dailyLikesCount) window.dailyLikesCount = 0;
+        if (userGender === 'homme' && window.dailyLikesCount >= 10 && !isUserPremium) {
+            window.location.href = STRIPE_PREMIUM_LINK;
+            return;
+        }
+        window.dailyLikesCount++;
+    }
+    }
             if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) return;
             const target = allUsers[currentProfileIndex];
             if (isLiked) {
