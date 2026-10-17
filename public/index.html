@@ -498,27 +498,14 @@ function acheterPremium() {
     socket.emit('register_user', { name: currentUser, gender: userGender, isPremium: true });
 }
 
-    // 2. Masque le bouton d'activation pour ne plus le voir après paiement
-    const btnActiver = document.querySelector(".profile-panel button, [onclick*='acheterPremium']");
-    if (btnActiver) {
-        btnActiver.style.display = "none";
+function sendMessage() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (text !== "") {
+        socket.emit('send_message', { author: currentUser, text: text, type: 'text' });
+        input.value = "";
     }
-
-    alert("Félicitations ! Votre abonnement Premium est activé.");
-    socket.emit('register_user', { name: currentUser, gender: userGender, isPremium: true });
 }
-         
-
-      
-
-        function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (text !== "") {
-                socket.emit('send_message', { author: currentUser, text: text, type: 'text' });
-                input.value = "";
-            }
-        }
         function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
 
         // Enregistrement vocal
