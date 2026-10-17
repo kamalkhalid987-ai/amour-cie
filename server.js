@@ -1,158 +1,130 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const cors = require('cors');
-// Remplacez 'votre_cle_secrete_stripe' par votre vraie clé secrète Stripe (commençant par sk_...)
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'votre_cle_secrete_stripe');
+const path = require('path');
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
-
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server);
 
-let users = {}; 
-let likes = {}; 
+// Augmentation de la limite pour recevoir les fichiers audio vocaux et photos HD
+app.use(express.json({ limit: '15mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/register', (req, res) => {
-  const { prenom, password, age, ville, genre, photo } = req.body;
-  if (!prenom || !password) return res.status(400).json({ error: 'Identifiants requis' });
-  
-  const key = prenom.trim().toLowerCase();
-  if (users[key]) {
-    return res.status(400).json({ error: 'Ce prénom existe déjà. Connectez-vous !' });
-  }
-
-  users[key] = {
-    prenom: prenom.trim(),
-    password,
-    age,
-    ville,
-    genre,
-    photo,
-    likesLeft: genre === 'Homme' ? 10 : Infinity,
-    isPremium: false
-  };
-  
-  res.json({ success: true, user: users[key] });
-});
-
-app.post('/api/login', (req, res) => {
-  const { prenom, password } = req.body;
-  const key = prenom.trim().toLowerCase();
-  
-  if (!users[key] || users[key].password !== password) {
-    return res.status(400).json({ error: 'Prénom ou mot de passe incorrect' });
-  }
-
-  res.json({ success: true, user: users[key] });
-});
-
-app.get('/api/profiles/:prenom', (req, res) => {
-  const currentKey = req.params.prenom.trim().toLowerCase();
-  const currentUser = users[currentKey];
-  if (!currentUser) return res.json([]);
-
-  const userLikes = likes[currentKey] || [];
-  const available = Object.values(users).filter(u => {
-    const uKey = u.prenom.trim().toLowerCase();
-    return uKey !== currentKey && !userLikes.includes(uKey);
-  });
-
-  res.json(available);
-});
-
-app.post('/api/like', (req, res) => {
-  const { from, to } = req.body;
-  const fromKey = from.trim().toLowerCase();
-  const toKey = to.trim().toLowerCase();
-
-  const user = users[fromKey];
-  if (!user) return res.status(400).json({ error: 'Utilisateur inconnu' });
-
-  if (user.genre === 'Homme' && !user.isPremium) {
-    if (user.likesLeft <= 0) {
-      return res.json({ success: false, paywall: true, message: "Quota de 10 likes journaliers atteint." });
-    }
-    user.likesLeft--;
-  }
-
-  if (!likes[fromKey]) likes[fromKey] = [];
-  if (!likes[fromKey].includes(toKey)) {
-    likes[fromKey].push(toKey);
-  }
-
-  let isMatch = false;
-  const targetLikes = likes[toKey] || [];
-  if (targetLikes.includes(fromKey)) {
-    isMatch = true;
-    io.to(toKey).emit('match_notification', { withUser: user });
-  }
-
-  res.json({ success: true, isMatch, likesLeft: user.likesLeft });
-});
-
-// Création d'une session de paiement Stripe (11 € / mois)
-app.post('/api/create-checkout-session', async (req, res) => {
-  const { prenom } = req.body;
-  const key = prenom ? prenom.trim().toLowerCase() : '';
-  
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: 'Pass Illimité Amour & Cie (Abonnement Mensuel)',
-          },
-          unit_amount: 1100, // 11,00 € en centimes
-          recurring: {
-            interval: 'month',
-          },
-        },
-        quantity: 1,
-      }],
-      mode: 'subscription',
-      success_url: `https://amour-cie-1.onrender.com/?success=true&user=${encodeURIComponent(prenom)}`,
-      cancel_url: `https://amour-cie-1.onrender.com/?canceled=true`,
-    });
-
-    res.json({ url: session.url });
-  } catch (e) {
-    console.error("Erreur Stripe:", e.message);
-    // Fallback de simulation si la clé Stripe n'est pas encore configurée sur Render
-    res.json({ simulated: true });
-  }
-});
-
-// Route pour valider le statut Premium après paiement réussi
-app.post('/api/upgrade', (req, res) => {
-  const { prenom } = req.body;
-  const key = prenom.trim().toLowerCase();
-  if (users[key]) {
-    users[key].isPremium = true;
-    users[key].likesLeft = Infinity;
-    return res.json({ success: true, user: users[key] });
-  }
-  res.status(400).json({ error: 'Utilisateur non trouvé' });
-});
+let users = [];
+let likesData = {};
 
 io.on('connection', (socket) => {
-  socket.on('join', (prenom) => {
-    if (prenom) socket.join(prenom.trim().toLowerCase());
-  });
+    console.log('Nouvelle connexion : ' + socket.id);
 
-  socket.on('send_message', ({ from, to, text }) => {
-    const data = { from, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-    io.to(to.trim().toLowerCase()).emit('receive_message', data);
-    io.to(from.trim().toLowerCase()).emit('receive_message', data);
-  });
+    // Inscription / Reconnexion d'un utilisateur (avec support Google Login)
+    socket.on('register_user', (userData) => {
+        let existingUser = users.find(u => u.name === userData.name);
+        if (!existingUser) {
+            users.push({
+                socketId: socket.id,
+                name: userData.name,
+                age: userData.age || "60",
+                city: userData.city || "Paris",
+                gender: userData.gender || "homme",
+                lookingFor: userData.lookingFor || "femme",
+                bio: userData.bio || "Bonjour !",
+                photo: userData.photo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
+                isPremium: userData.isPremium || false
+            });
+        } else {
+            existingUser.socketId = socket.id;
+            existingUser.age = userData.age || existingUser.age;
+            existingUser.city = userData.city || existingUser.city;
+            existingUser.gender = userData.gender || existingUser.gender;
+            existingUser.lookingFor = userData.lookingFor || existingUser.lookingFor;
+            existingUser.bio = userData.bio || existingUser.bio;
+            if (userData.photo) existingUser.photo = userData.photo;
+            if (userData.isPremium !== undefined) existingUser.isPremium = userData.isPremium;
+        }
+        updateProfilesForEveryone();
+    });
+
+    // Traitement du Like et contrôle des quotas
+    socket.on('send_like', (data) => {
+        const { senderName, targetName, isLiked } = data;
+        const sender = users.find(u => u.name === senderName);
+        if (!sender) return;
+
+        const isLimited = (sender.gender === 'homme' && sender.lookingFor === 'femme' && !sender.isPremium);
+
+        if (isLiked && isLimited) {
+            const today = new Date().toISOString().slice(0, 10);
+            if (!likesData[senderName] || likesData[senderName].date !== today) {
+                likesData[senderName] = { count: 0, date: today };
+            }
+
+            if (likesData[senderName].count >= 10) {
+                socket.emit('like_limit_reached', {
+                    message: "⚠️ Vous avez atteint votre limite de 10 likes gratuits aujourd'hui. Passez à l'abonnement Premium pour liker en illimité !"
+                });
+                return;
+            }
+            likesData[senderName].count++;
+        }
+
+        if (isLiked) {
+            socket.emit('match_success', { targetName });
+        }
+    });
+
+    // Messagerie texte et vocale
+    socket.on('send_message', (data) => {
+        io.emit('receive_message', data);
+    });
+
+    // --- WEBRTC SIGNALING (Appels Audio / Vidéo) ---
+    socket.on('call_user', (data) => {
+        const targetUser = users.find(u => u.name === data.targetName);
+        if (targetUser) {
+            io.to(targetUser.socketId).emit('incoming_call', {
+                callerName: data.callerName,
+                offer: data.offer,
+                callType: data.callType // 'audio' ou 'video'
+            });
+        }
+    });
+
+    socket.on('make_answer', (data) => {
+        const targetUser = users.find(u => u.name === data.targetName);
+        if (targetUser) {
+            io.to(targetUser.socketId).emit('call_answered', {
+                answer: data.answer
+            });
+        }
+    });
+
+    socket.on('ice_candidate', (data) => {
+        const targetUser = users.find(u => u.name === data.targetName);
+        if (targetUser) {
+            io.to(targetUser.socketId).emit('ice_candidate', {
+                candidate: data.candidate
+            });
+        }
+    });
+
+    socket.on('end_call', (data) => {
+        const targetUser = users.find(u => u.name === data.targetName);
+        if (targetUser) {
+            io.to(targetUser.socketId).emit('call_ended');
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Un utilisateur s\'est déconnecté.');
+    });
 });
 
+function updateProfilesForEveryone() {
+    io.emit('update_users_list', users);
+}
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Serveur actif sur le port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Serveur Amour & Cie démarré sur http://localhost:${PORT}`);
 });
