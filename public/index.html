@@ -458,9 +458,8 @@
             cardBio.innerText = profile.bio || "Pas de description.";
             cardPhoto.style.backgroundImage = `url('${profile.photo}')`;
         }
-
-        function swiperProfil(isLiked) {
-            // Vérification de la limite de 10 likes pour les hommes
+function swiperProfil(isLike) {
+    // 1. On vérifie les likes pour les hommes
     if (isLike) {
         if (!window.dailyLikesCount) window.dailyLikesCount = 0;
         if (userGender === 'homme' && window.dailyLikesCount >= 10 && !isUserPremium) {
@@ -469,15 +468,20 @@
         }
         window.dailyLikesCount++;
     }
+
+    // 2. Le reste du code normal de swipe
+    if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) return;
+
+    const target = allUsers[currentProfileIndex];
+    if (isLike) {
+        socket.emit('send_like', { senderName: currentUser, targetName: target.name, isliked: true });
     }
-            if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) return;
-            const target = allUsers[currentProfileIndex];
-            if (isLiked) {
-                socket.emit('send_like', { senderName: currentUser, targetName: target.name, isLiked: true });
-            }
-            currentProfileIndex++;
-            afficherProfilCourant();
-        }
+    currentProfileIndex++;
+    afficherProfilCourant();
+}
+
+
+         
 
         function acheterPremium() {
             isUserPremium = true;
