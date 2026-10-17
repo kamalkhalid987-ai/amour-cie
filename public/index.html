@@ -267,7 +267,7 @@
                 <div id="premium-box" style="background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 10px; margin-top: 8px; text-align: center;">
                     <h4 style="color: #d35400; margin-bottom: 2px; font-size: 13px;">⭐ Abonnement Premium</h4>
                     <p style="font-size: 10px; color: #666; margin-bottom: 6px;">Nécessaire après vos 10 likes gratuits quotidiens.</p>
-                    <button type="button" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="acheterPremium()">Activer l'abonnement (9,99€)</button>
+                    <button type="button" id="btn-acheter" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="acheterPremium()">Activer l'abonnement (9,99€)</button>
                 </div>
 
                 <button type="button" class="btn-main" style="background: #d9534f; margin-top: 10px; padding: 9px;" onclick="deconnecter()">🚪 Se déconnecter</button>
@@ -483,12 +483,20 @@ function swiperProfil(isLike) {
 function acheterPremium() {
     isUserPremium = true;
     
-    // 1. Met à jour le texte du badge ou du statut
     const badge = document.getElementById("badge-status");
     if (badge) {
         badge.innerText = "⭐ Premium Illimité";
         badge.style.color = "#f39c12";
     }
+
+    const btnActiver = document.getElementById("btn-acheter");
+    if (btnActiver) {
+        btnActiver.style.display = "none";
+    }
+
+    alert("Félicitations ! Votre abonnement Premium est activé.");
+    socket.emit('register_user', { name: currentUser, gender: userGender, isPremium: true });
+}
 
     // 2. Masque le bouton d'activation pour ne plus le voir après paiement
     const btnActiver = document.querySelector(".profile-panel button, [onclick*='acheterPremium']");
