@@ -30,579 +30,313 @@
         .app-container {
             width: 100%; max-width: 420px; height: 740px;
             background: var(--card-bg); border-radius: 28px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
             display: flex; flex-direction: column; overflow: hidden; position: relative;
         }
 
-        .app-header {
-            padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
-            background: #fff; border-bottom: 1px solid #f0f0f0;
+        /* Screen Views */
+        .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+        .screen.active { display: flex; }
+
+        /* Auth Screen */
+        #auth-screen { justify-content: center; align-items: center; padding: 30px; text-align: center; }
+        #auth-screen h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 8px; font-weight: 800; }
+        #auth-screen p { color: #666; margin-bottom: 30px; font-size: 0.95rem; }
+
+        .auth-box { width: 100%; display: flex; flex-direction: column; gap: 15px; }
+        .form-group { text-align: left; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: #444; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 12px; font-size: 1rem; outline: none;
         }
 
-        .app-logo { font-size: 18px; font-weight: 800; color: var(--primary); }
-
-        .view-content { flex: 1; display: flex; flex-direction: column; padding: 12px 15px; overflow-y: auto; }
-        .view-panel { display: none; flex-direction: column; height: 100%; }
-        .view-panel.active { display: flex; }
-
-        .form-group { margin-bottom: 8px; display: flex; flex-direction: column; gap: 3px; }
-        .form-group label { font-size: 11px; font-weight: 600; color: #666; }
-
-        input, select, textarea, button {
-            width: 100%; padding: 9px; border-radius: 10px; border: 1px solid #ddd; font-size: 13px; outline: none;
+        .btn-main {
+            background: var(--primary); color: white; border: none; padding: 14px;
+            border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: 0.2s; width: 100%;
         }
+        .btn-main:hover { background: var(--primary-hover); }
 
-        .input-row { display: flex; gap: 6px; }
-
-        .btn-main { background: var(--primary); color: white; border: none; font-weight: 700; cursor: pointer; }
-        .btn-green { background: var(--green-btn); color: white; border: none; font-weight: 700; cursor: pointer; }
-        .btn-gold { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; border: none; font-weight: 700; cursor: pointer; }
-
-        .btn-gps {
-            width: auto; white-space: nowrap; background: var(--green-btn);
-            color: white; border: none; cursor: pointer; font-size: 12px; padding: 0 12px; border-radius: 10px;
+        /* Header Nav */
+        .header {
+            height: 60px; border-bottom: 1px solid #eee; display: flex;
+            justify-content: space-between; align-items: center; padding: 0 20px;
         }
+        .header .logo { font-weight: 800; color: var(--primary); font-size: 1.3rem; }
+        .header-actions { display: flex; gap: 12px; align-items: center; }
 
-        .photo-picker-box { display: flex; flex-direction: column; align-items: center; margin: 4px 0; }
-        .photo-preview {
-            width: 80px; height: 80px; border-radius: 50%; background-size: cover;
-            background-position: center; border: 3px solid var(--primary); margin-bottom: 4px; background-color: #eee;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
+        /* Main Content Scrollable Area */
+        .main-content { flex: 1; overflow-y: auto; padding: 15px; position: relative; }
 
-        .swipe-card {
-            flex: 1; background: #fff; border-radius: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-            border: 1px solid #f0f0f0; display: flex; flex-direction: column; overflow: hidden; position: relative;
+        /* Swiper / Cards */
+        .card-stack { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .user-card {
+            position: absolute; width: 100%; height: 100%; background: #fff;
+            border-radius: 20px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex; flex-direction: column; overflow: hidden;
         }
-        .photo-container {
-            flex: 1; background-size: cover; background-position: center; position: relative;
-            display: flex; align-items: flex-end; padding: 15px; min-height: 240px;
-        }
-        .photo-overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%);
-        }
-        .profile-info { position: relative; z-index: 2; color: white; }
-        .profile-name { font-size: 20px; font-weight: 800; }
-        .profile-details { padding: 10px; background: white; }
-        .profile-bio { font-size: 12px; color: #666; line-height: 1.3; }
+        .user-card img { width: 100%; height: 65%; object-fit: cover; }
+        .user-card-info { padding: 15px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .user-card-info h3 { font-size: 1.4rem; font-weight: 700; }
+        .user-card-info p { color: #666; font-size: 0.9rem; }
 
-        .swipe-actions { display: flex; justify-content: space-around; padding: 8px 0; }
-        .action-btn {
-            width: 48px; height: 48px; border-radius: 50%; border: none;
-            display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        /* Controls */
+        .card-controls {
+            position: absolute; bottom: 20px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 25px; z-index: 10;
         }
-        .btn-pass { background: #fff; color: #e74c3c; border: 1px solid #fee; }
-        .btn-like { background: #2ecc71; color: #fff; }
-
-        .chat-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .call-buttons { display: flex; gap: 6px; }
-        .btn-call { padding: 5px 10px; font-size: 11px; border-radius: 8px; border: none; cursor: pointer; color: white; font-weight: bold; }
-        .btn-audio-call { background: #3498db; }
-        .btn-video-call { background: #9b59b6; }
-
-        .chat-box {
-            flex: 1; border: 1px solid #eee; border-radius: 12px; padding: 10px;
-            overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; margin-bottom: 8px;
+        .control-btn {
+            width: 60px; height: 60px; border-radius: 50%; border: none;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.5rem; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.15); transition: transform 0.2s;
         }
-        .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.3; }
-        .msg.me { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
-        .msg.other { align-self: flex-start; background: #e5e5ea; color: #000; border-bottom-left-radius: 2px; }
-        .msg-author { font-size: 10px; opacity: 0.8; margin-bottom: 2px; font-weight: bold; }
-        
-        .chat-input-row { display: flex; gap: 6px; align-items: center; }
-        .chat-input-row input { flex: 1; }
-        .chat-input-row button { width: auto; padding: 0 10px; font-size: 12px; height: 36px; }
+        .control-btn:active { transform: scale(0.9); }
+        .btn-dislike { background: #fff; color: var(--danger-btn); }
+        .btn-like { background: var(--primary); color: #fff; }
 
-        #call-modal {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85); z-index: 100; display: none;
-            flex-direction: column; align-items: center; justify-content: center; color: white; padding: 20px; text-align: center;
+        /* Footer Nav */
+        .footer-nav {
+            height: 60px; border-top: 1px solid #eee; display: flex; justify-content: space-around; align-items: center; background: #fff;
         }
-        #call-videos { display: flex; gap: 10px; margin-bottom: 20px; width: 100%; justify-content: center; }
-        video { width: 140px; height: 180px; background: #000; border-radius: 10px; object-fit: cover; }
-        video#localVideo { transform: scaleX(-1); }
+        .nav-item { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #888; }
+        .nav-item.active { color: var(--primary); }
 
-        .bottom-nav { display: flex; background: #fff; border-top: 1px solid #eee; padding: 8px 0; }
-        .nav-item {
-            flex: 1; display: flex; flex-direction: column; align-items: center;
-            justify-content: center; font-size: 11px; color: #888; cursor: pointer; gap: 3px;
+        /* Chat Screen */
+        .chat-list { display: flex; flex-direction: column; gap: 10px; }
+        .chat-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px;
+            border-radius: 12px; cursor: pointer; background: #f9f9f9;
         }
-        .nav-item.active { color: var(--primary); font-weight: bold; }
-        .nav-icon { font-size: 16px; }
+        .chat-avatar { width: 50px; height: 50px; border-radius: 50%; background: #ccc; object-fit: cover; }
+
+        .chat-box { display: flex; flex-direction: column; height: 100%; }
+        .messages-container { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 0.95rem; }
+        .message.sent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+        .message.received { align-self: flex-start; background: #f0f0f0; color: #333; border-bottom-left-radius: 4px; }
+
+        .chat-input-area { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; align-items: center; }
+        .chat-input-area input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+
+        /* Paywall Modal */
+        .modal {
+            display: none; position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: #fff; border-radius: 20px; padding: 25px; text-align: center; width: 100%; max-width: 340px;
+        }
+        .modal-content h2 { color: var(--gold); margin-bottom: 10px; }
+        .modal-content p { color: #555; font-size: 0.95rem; margin-bottom: 20px; }
+        .btn-stripe {
+            background: var(--gold); color: white; text-decoration: none; display: block;
+            padding: 12px; border-radius: 12px; font-weight: 700; transition: 0.2s;
+        }
+        .btn-stripe:hover { background: #d8870e; }
     </style>
 </head>
 <body>
 
-    <div class="app-container">
-        <!-- HEADER -->
-        <div class="app-header">
-            <div class="app-logo">🌹 Amour & Cie</div>
-            <div id="badge-status" style="font-size: 11px; font-weight: bold; color: var(--green-btn);">Standard</div>
-        </div>
+<div class="app-container">
 
-        <div class="view-content">
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="screen active">
+        <h1>Amour & Cie</h1>
+        <p>Trouvez l'amour en toute simplicité</p>
 
-            <!-- 1. VUE INSCRIPTION / CONNEXION -->
-            <div id="view-auth" class="view-panel active">
-                <h3 style="text-align: center; margin-bottom: 6px; color: var(--primary); font-size: 16px;">Connexion ou Inscription</h3>
-
-                <!-- BOUTON CONNEXION GOOGLE -->
-                <div style="display: flex; justify-content: center; margin-bottom: 6px;">
-                    <div id="g_id_onload"
-                         data-client_id="612038682112-je9l72mvtcv49daic2pt2aik8t3p0g5c.apps.googleusercontent.com"
-                         data-callback="handleGoogleResponse"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin" data-type="standard" data-size="large" data-text="signin_with" data-shape="rectangular"></div>
-                </div>
-
-                <div style="text-align: center; font-size: 10px; color: #888; margin-bottom: 4px;">— OU —</div>
-
-                <div class="photo-picker-box">
-                    <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80');"></div>
-                    <input type="file" id="gallery-file" accept="image/*" style="display: none;" onchange="chargerPhotoGalerie(event)">
-                    <button type="button" class="btn-green" style="padding: 4px 10px; font-size: 11px; width: auto;" onclick="document.getElementById('gallery-file').click()">🖼️ Choisir une photo</button>
-                </div>
-
-                <div class="form-group">
-                    <label>Prénom</label>
-                    <input type="text" id="reg-name" placeholder="Votre prénom...">
-                </div>
-
-                <div style="display: flex; gap: 8px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Âge</label>
-                        <input type="number" id="reg-age" placeholder="Ex: 28">
-                    </div>
-                    <div class="form-group" style="flex: 2;">
-                        <label>Ville</label>
-                        <div class="input-row">
-                            <input type="text" id="reg-city" placeholder="Ex: Paris">
-                            <button type="button" class="btn-gps" onclick="obtenirGeolocalisation()">📍 GPS</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display: flex; gap: 8px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Je suis :</label>
-                        <select id="reg-gender">
-                            <option value="homme">Un Homme</option>
-                            <option value="femme">Une Femme</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>Je cherche :</label>
-                        <select id="reg-looking">
-                            <option value="femme">Une Femme</option>
-                            <option value="homme">Un Homme</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Bio / Description</label>
-                    <textarea id="reg-bio" rows="2" placeholder="Écrivez quelques mots sur vous..."></textarea>
-                </div>
-
-                <button type="button" class="btn-main" style="margin-top: 4px; padding: 10px;" onclick="seConnecter()">Créer mon compte</button>
+        <div class="auth-box">
+            <div class="form-group">
+                <label>Votre Prénom</label>
+                <input type="text" id="user-name" placeholder="Ex: Thomas">
             </div>
-
-            <!-- 2. VUE SWIPE -->
-            <div id="view-swipe" class="view-panel">
-                <div class="swipe-card" id="card-container">
-                    <div id="card-photo" class="photo-container" style="background-image: url('');">
-                        <div class="photo-overlay"></div>
-                        <div class="profile-info">
-                            <div class="profile-name"><span id="card-name">Recherche...</span>, <span id="card-age">--</span> ans</div>
-                            <div style="font-size: 12px; opacity: 0.9;">📍 <span id="card-city">--</span></div>
-                        </div>
-                    </div>
-                    <div class="profile-details">
-                        <div class="profile-bio" id="card-bio">En attente d'autres célibataires...</div>
-                    </div>
-                </div>
-
-                <div class="swipe-actions">
-                    <button type="button" class="action-btn btn-pass" onclick="swiperProfil(false)">❌</button>
-                    <button type="button" class="action-btn btn-like" onclick="swiperProfil(true)">❤️</button>
-                </div>
+            <div class="form-group">
+                <label>Votre Genre</label>
+                <select id="user-gender">
+                    <option value="homme">Homme</option>
+                    <option value="femme">Femme</option>
+                </select>
             </div>
-
-            <!-- 3. VUE MESSAGES & APPELS -->
-            <div id="view-chat" class="view-panel">
-                <div class="chat-header-actions">
-                    <h3 style="font-size: 15px;">Discussion</h3>
-                    <div class="call-buttons">
-                        <button class="btn-call btn-audio-call" onclick="startCall('audio')">📞 Appel Audio</button>
-                        <button class="btn-call btn-video-call" onclick="startCall('video')">📹 Vidéo</button>
-                    </div>
-                </div>
-                
-                <div class="chat-box" id="chat-messages">
-                    <div class="msg other">
-                        <div class="msg-author">Système</div>
-                        Discutez, envoyez des vocaux et appelez vos matchs en direct !
-                    </div>
-                </div>
-
-                <div class="chat-input-row">
-                    <input type="text" id="msg-input" placeholder="Votre message..." onkeypress="handleKeyPress(event)">
-                    <button type="button" class="btn-main" onclick="sendMessage()">Envoyer</button>
-                    <button type="button" class="btn-green" id="btn-record" onclick="toggleRecordVoice()" title="Enregistrer un vocal">🎤</button>
-                </div>
-            </div>
-
-            <!-- 4. VUE PROFIL & PREMIUM -->
-            <div id="view-profile" class="view-panel">
-                <h3 style="margin-bottom: 8px; font-size: 15px;">Mon Compte</h3>
-                <div class="photo-picker-box">
-                    <div id="user-photo-view" class="photo-preview"></div>
-                    <b id="user-display-name"></b>
-                    <span id="user-city-view" style="font-size: 11px; color: #666;"></span>
-                </div>
-
-                <div id="premium-box" style="background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 10px; margin-top: 8px; text-align: center;">
-                    <h4 style="color: #d35400; margin-bottom: 2px; font-size: 13px;">⭐ Abonnement Premium</h4>
-                    <p style="font-size: 10px; color: #666; margin-bottom: 6px;">Nécessaire après vos 10 likes gratuits quotidiens.</p>
-                    <button type="button" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="acheterPremium()">Activer l'abonnement (9,99€)</button>
-                </div>
-
-                <button type="button" class="btn-main" style="background: #d9534f; margin-top: 10px; padding: 9px;" onclick="deconnecter()">🚪 Se déconnecter</button>
-            </div>
-
-        </div>
-
-        <!-- MODALE APPEL AUDIO / VIDEO EN COURS -->
-        <div id="call-modal">
-            <h3 id="call-status-text" style="margin-bottom: 10px;">Appel en cours...</h3>
-            <div id="call-videos">
-                <video id="localVideo" autoplay muted playsinline></video>
-                <video id="remoteVideo" autoplay playsinline></video>
-            </div>
-            <button type="button" class="btn-main" style="background: var(--danger-btn); width: 120px;" onclick="endCall()">Raccrocher</button>
-        </div>
-
-        <!-- NAVBAR -->
-        <div class="bottom-nav" id="bottom-nav" style="display: none;">
-            <div class="nav-item active" id="nav-swipe" onclick="switchTab('swipe', this)"><div class="nav-icon">🔥</div><span>Découvrir</span></div>
-            <div class="nav-item" id="nav-chat" onclick="switchTab('chat', this)"><div class="nav-icon">💬</div><span>Messages</span></div>
-            <div class="nav-item" id="nav-profile" onclick="switchTab('profile', this)"><div class="nav-icon">👤</div><span>Profil</span></div>
+            <button class="btn-main" onclick="registerUser()">Commencer</button>
         </div>
     </div>
 
-    <script>
-        const socket = io();
-        let currentUser = "";
-        let userGender = "homme";
-        let userPhotoBase64 = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80";
-        let isUserPremium = false;
-        let allUsers = [];
-        let currentProfileIndex = 0;
+    <!-- MAIN APP SCREEN -->
+    <div id="app-screen" class="screen">
+        <div class="header">
+            <div class="logo">Amour & Cie</div>
+            <div class="header-actions">
+                <span id="user-status" style="font-size: 0.8rem; background: #eee; padding: 4px 8px; border-radius: 10px;">Gratuit</span>
+            </div>
+        </div>
 
-        // Connexion Google
-        function handleGoogleResponse(response) {
-            try {
-                const base64Url = response.credential.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-                const googleUser = JSON.parse(jsonPayload);
+        <!-- DISCOVERY VIEW -->
+        <div id="view-swipe" class="main-content" style="display: block;">
+            <div class="card-stack" id="card-stack">
+                <!-- Profiles dynamically loaded -->
+            </div>
+            <div class="card-controls">
+                <button class="control-btn btn-dislike" onclick="handleSwipe(false)">✕</button>
+                <button class="control-btn btn-like" onclick="handleSwipe(true)">♥</button>
+            </div>
+        </div>
 
-                document.getElementById("reg-name").value = googleUser.given_name || googleUser.name;
-                if (googleUser.picture) {
-                    userPhotoBase64 = googleUser.picture;
-                    document.getElementById("reg-photo-preview").style.backgroundImage = `url('${userPhotoBase64}')`;
+        <!-- CHAT LIST VIEW -->
+        <div id="view-chats" class="main-content" style="display: none;">
+            <h3>Vos Conversations</h3>
+            <div class="chat-list" id="chat-list" style="margin-top: 15px;">
+                <!-- Chats dynamically loaded -->
+            </div>
+        </div>
+
+        <!-- ACTIVE CHAT VIEW -->
+        <div id="view-chat-room" class="main-content" style="display: none; height: 100%; padding:0;">
+            <div class="chat-box">
+                <div style="padding: 10px; border-bottom: 1px solid #eee; display:flex; align-items:center; gap:10px;">
+                    <button onclick="showView('chats')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">←</button>
+                    <h4 id="chat-target-name">Discussion</h4>
+                </div>
+                <div class="messages-container" id="messages-container"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="Écrivez votre message...">
+                    <button class="btn-main" style="width: auto; padding: 10px 15px;" onclick="sendMessage()">Envoyer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER NAV -->
+        <div class="footer-nav">
+            <button class="nav-item active" onclick="showView('swipe')">🔥</button>
+            <button class="nav-item" onclick="showView('chats')">💬</button>
+        </div>
+    </div>
+
+    <!-- PAYWALL MODAL -->
+    <div id="paywall-modal" class="modal">
+        <div class="modal-content">
+            <h2>Limite de Likes atteinte !</h2>
+            <p>Les hommes ont droit à 10 likes gratuits par jour. Passez à la version Premium pour profiter de likes illimités !</p>
+            <a href="https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000" class="btn-stripe">Passer Premium - 9,99 €/mois</a>
+            <button onclick="closePaywall()" style="background:none; border:none; margin-top:15px; color:#888; cursor:pointer;">Plus tard</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const STRIPE_PREMIUM_LINK = "https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000";
+
+    let currentUser = {
+        name: "",
+        gender: "homme",
+        isPremium: false,
+        dailyLikes: 0
+    };
+
+    const mockProfiles = [
+        { id: 1, name: "Sophie, 24 ans", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400" },
+        { id: 2, name: "Camille, 26 ans", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400" },
+        { id: 3, name: "Élodie, 23 ans", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400" },
+        { id: 4, name: "Emma, 25 ans", img: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400" }
+    ];
+
+    let currentProfileIndex = 0;
+
+    function registerUser() {
+        const nameInput = document.getElementById('user-name').value;
+        const genderInput = document.getElementById('user-gender').value;
+
+        if (!nameInput.trim()) {
+            alert("Veuillez entrer votre prénom.");
+            return;
+        }
+
+        currentUser.name = nameInput;
+        currentUser.gender = genderInput;
+
+        // Charger le nombre de likes depuis le stockage local
+        const savedLikes = localStorage.getItem('dailyLikes_' + currentUser.name);
+        if (savedLikes) {
+            currentUser.dailyLikes = parseInt(savedLikes, 10);
+        }
+
+        document.getElementById('auth-screen').classList.remove('active');
+        document.getElementById('app-screen').classList.add('active');
+
+        loadCurrentCard();
+    }
+
+    function loadCurrentCard() {
+        const stack = document.getElementById('card-stack');
+        stack.innerHTML = "";
+
+        if (currentProfileIndex >= mockProfiles.length) {
+            stack.innerHTML = "<p style='color:#888;'>Plus de profils disponibles autour de vous !</p>";
+            return;
+        }
+
+        const profile = mockProfiles[currentProfileIndex];
+        const card = document.createElement('div');
+        card.className = "user-card";
+        card.innerHTML = `
+            <img src="${profile.img}" alt="${profile.name}">
+            <div class="user-card-info">
+                <h3>${profile.name}</h3>
+                <p>À moins de 10 km de chez vous</p>
+            </div>
+        `;
+        stack.appendChild(card);
+    }
+
+    function handleSwipe(isLike) {
+        if (isLike) {
+            // Restriction Stripe pour les hommes au-delà de 10 likes
+            if (currentUser.gender === 'homme' && !currentUser.isPremium) {
+                if (currentUser.dailyLikes >= 10) {
+                    showPaywall();
+                    return;
                 }
-                alert(`Bienvenue ${googleUser.name} ! Complétez les dernières infos si besoin et validez.`);
-            } catch(e) {
-                console.error("Erreur connexion Google", e);
+                currentUser.dailyLikes++;
+                localStorage.setItem('dailyLikes_' + currentUser.name, currentUser.dailyLikes);
             }
         }
 
-        function chargerPhotoGalerie(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    userPhotoBase64 = e.target.result;
-                    document.getElementById("reg-photo-preview").style.backgroundImage = `url('${userPhotoBase64}')`;
-                };
-                reader.readAsDataURL(file);
-            }
-        }
+        currentProfileIndex++;
+        loadCurrentCard();
+    }
 
-        function obtenirGeolocalisation() {
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        try {
-                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                            const data = await res.json();
-                            const city = data.address.city || data.address.town || data.address.village || "Ma ville";
-                            document.getElementById("reg-city").value = city;
-                            alert(`📍 Ville détectée : ${city}`);
-                        } catch(e) {
-                            document.getElementById("reg-city").value = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-                            alert("📍 Position GPS récupérée !");
-                        }
-                    },
-                    (error) => {
-                        alert("Impossible de récupérer la position GPS. Vérifiez les autorisations de votre navigateur.");
-                    }
-                );
-            } else {
-                alert("La géolocalisation n'est pas prise en charge.");
-            }
-        }
+    function showPaywall() {
+        document.getElementById('paywall-modal').classList.add('active');
+    }
 
-        socket.on('update_users_list', (users) => {
-            allUsers = users.filter(u => u.name !== currentUser);
-            currentProfileIndex = 0;
-            afficherProfilCourant();
-        });
+    function closePaywall() {
+        document.getElementById('paywall-modal').classList.remove('active');
+    }
 
-        socket.on('like_limit_reached', (data) => {
-            alert(data.message);
-            switchTab('profile', document.getElementById('nav-profile'));
-        });
+    function showView(viewName) {
+        document.getElementById('view-swipe').style.display = viewName === 'swipe' ? 'block' : 'none';
+        document.getElementById('view-chats').style.display = viewName === 'chats' ? 'block' : 'none';
+        document.getElementById('view-chat-room').style.display = viewName === 'chat-room' ? 'block' : 'none';
 
-        socket.on('match_success', (data) => {
-            alert(`🎉 C'est un Match avec ${data.targetName} ! Vous pouvez discuter et l'appeler.`);
-            switchTab('chat', document.getElementById('nav-chat'));
-        });
+        const navBtns = document.querySelectorAll('.footer-nav .nav-item');
+        navBtns[0].classList.toggle('active', viewName === 'swipe');
+        navBtns[1].classList.toggle('active', viewName === 'chats' || viewName === 'chat-room');
+    }
 
-        socket.on('receive_message', (data) => {
-            const chatBox = document.getElementById('chat-messages');
-            const isMe = data.author === currentUser;
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `msg ${isMe ? 'me' : 'other'}`;
-            
-            let contentHTML = data.text;
-            if (data.type === 'voice') {
-                contentHTML = `<audio controls src="${data.audioUrl}" style="height:32px; width:180px;"></audio>`;
-            }
+    function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
 
-            msgDiv.innerHTML = `<div class="msg-author">${data.author}</div>${contentHTML}`;
-            chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        });
+        const container = document.getElementById('messages-container');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = "message sent";
+        msgDiv.textContent = text;
+        container.appendChild(msgDiv);
 
-        function switchTab(tabName, element) {
-            document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
-            document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-            document.getElementById("view-" + tabName).classList.add("active");
-            if (element) element.classList.add("active");
-        }
+        input.value = "";
+        container.scrollTop = container.scrollHeight;
+    }
+</script>
 
-        function seConnecter() {
-            const name = document.getElementById("reg-name").value.trim();
-            const age = document.getElementById("reg-age").value.trim();
-            const city = document.getElementById("reg-city").value.trim();
-            const gender = document.getElementById("reg-gender").value;
-            const lookingFor = document.getElementById("reg-looking").value;
-            const bio = document.getElementById("reg-bio").value.trim();
-
-            if (!name) { alert("Veuillez inscrire votre prénom."); return; }
-
-            currentUser = name;
-            userGender = gender;
-            document.getElementById("user-display-name").innerText = `${name}, ${age || '25'} ans (${gender})`;
-            document.getElementById("user-city-view").innerText = city || 'Paris';
-            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
-
-            if (gender === 'femme') {
-                document.getElementById("premium-box").style.display = "none";
-                document.getElementById("badge-status").innerText = "Compte Gratuit (Illimité)";
-            } else {
-                document.getElementById("premium-box").style.display = "block";
-                document.getElementById("badge-status").innerText = "Standard (10 likes/j)";
-            }
-
-            document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name, age, city, gender, lookingFor, bio, photo: userPhotoBase64, isPremium: isUserPremium });
-            switchTab("swipe", document.getElementById("nav-swipe"));
-        }
-
-        function deconnecter() {
-            currentUser = "";
-            document.getElementById("bottom-nav").style.display = "none";
-            switchTab("auth");
-        }
-
-        function afficherProfilCourant() {
-            const cardPhoto = document.getElementById("card-photo");
-            const cardName = document.getElementById("card-name");
-            const cardAge = document.getElementById("card-age");
-            const cardCity = document.getElementById("card-city");
-            const cardBio = document.getElementById("card-bio");
-
-            if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) {
-                cardName.innerText = "Plus de profils";
-                cardAge.innerText = "--";
-                cardCity.innerText = "Revenez plus tard";
-                cardBio.innerText = "Connectez un 2ème appareil pour créer un autre profil à liker !";
-                cardPhoto.style.backgroundImage = "none";
-                return;
-            }
-
-            const profile = allUsers[currentProfileIndex];
-            cardName.innerText = profile.name || "Inconnu";
-            cardAge.innerText = profile.age || "--";
-            cardCity.innerText = profile.city || "Paris";
-            cardBio.innerText = profile.bio || "Pas de description.";
-            cardPhoto.style.backgroundImage = `url('${profile.photo}')`;
-        }
-
-        function swiperProfil(isLiked) {
-            if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) return;
-            const target = allUsers[currentProfileIndex];
-            if (isLiked) {
-                socket.emit('send_like', { senderName: currentUser, targetName: target.name, isLiked: true });
-            }
-            currentProfileIndex++;
-            afficherProfilCourant();
-        }
-
-        function acheterPremium() {
-            isUserPremium = true;
-            document.getElementById("badge-status").innerText = "⭐ Premium Illimité";
-            document.getElementById("badge-status").style.color = "#f39c12";
-            alert(" Félicitations ! Votre abonnement Premium est activé.");
-            socket.emit('register_user', { name: currentUser, gender: userGender, isPremium: true });
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (text !== "") {
-                socket.emit('send_message', { author: currentUser, text: text, type: 'text' });
-                input.value = "";
-            }
-        }
-        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
-
-        // Enregistrement vocal
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-
-        async function toggleRecordVoice() {
-            const btn = document.getElementById('btn-record');
-            if (!isRecording) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const reader = new FileReader();
-                        reader.readAsDataURL(audioBlob);
-                        reader.onloadend = () => {
-                            socket.emit('send_message', { author: currentUser, audioUrl: reader.result, type: 'voice' });
-                        };
-                    };
-                    mediaRecorder.start();
-                    isRecording = true;
-                    btn.style.background = "red";
-                    btn.innerText = "⏹️";
-                } catch (e) {
-                    alert("Impossible d'accéder au micro.");
-                }
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
-                btn.style.background = "var(--green-btn)";
-                btn.innerText = "🎤";
-            }
-        }
-
-        // WebRTC Appels Audio / Vidéo
-        let localStream;
-        let peerConnection;
-        const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-        async function startCall(callType) {
-            if (allUsers.length === 0) { alert("Aucun correspondant disponible pour l'appel."); return; }
-            const target = allUsers[0];
-
-            document.getElementById('call-modal').style.display = 'flex';
-            document.getElementById('call-status-text').innerText = `Appel de ${target.name}...`;
-
-            localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'video', audio: true });
-            document.getElementById('localVideo').srcObject = localStream;
-            if(callType === 'audio') document.getElementById('localVideo').style.display = 'none';
-
-            peerConnection = new RTCPeerConnection(servers);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            peerConnection.ontrack = event => {
-                document.getElementById('remoteVideo').srcObject = event.streams[0];
-            };
-
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    socket.emit('ice_candidate', { targetName: target.name, candidate: event.candidate });
-                }
-            };
-
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            socket.emit('call_user', { targetName: target.name, callerName: currentUser, offer, callType });
-        }
-
-        socket.on('incoming_call', async (data) => {
-            if (confirm(`📞 Appel entrant de ${data.callerName} (${data.callType}). Accepter ?`)) {
-                document.getElementById('call-modal').style.display = 'flex';
-                localStream = await navigator.mediaDevices.getUserMedia({ video: data.callType === 'video', audio: true });
-                document.getElementById('localVideo').srcObject = localStream;
-
-                peerConnection = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                peerConnection.ontrack = event => {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        socket.emit('ice_candidate', { targetName: data.callerName, candidate: event.candidate });
-                    }
-                };
-
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                socket.emit('make_answer', { targetName: data.callerName, answer });
-            }
-        });
-
-        socket.on('call_answered', async (data) => {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        });
-
-        socket.on('ice_candidate', async (data) => {
-            if (peerConnection) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
-        });
-
-        socket.on('call_ended', () => {
-            endCall(false);
-        });
-
-        function endCall(notify = true) {
-            if (notify && allUsers.length > 0) {
-                socket.emit('end_call', { targetName: allUsers[0].name });
-            }
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            if (peerConnection) peerConnection.close();
-            document.getElementById('call-modal').style.display = 'none';
-        }
-    </script>
 </body>
 </html>
