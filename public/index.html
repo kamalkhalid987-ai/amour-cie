@@ -547,7 +547,15 @@ function sendMessage() {
         // WebRTC Appels Audio / Vidéo
         let localStream;
         let peerConnection;
-        const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const servers = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
+    ]
+};
 
         async function startCall(callType) {
             if (allUsers.length === 0) { alert("Aucun correspondant disponible pour l'appel."); return; }
