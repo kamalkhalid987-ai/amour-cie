@@ -173,11 +173,6 @@
                         <input type="text" id="reg-name" placeholder="Votre Prénom" required>
                     </div>
 
-                    <div class="form-group">
-                        <label>Adresse E-mail</label>
-                        <input type="email" id="reg-email" placeholder="Votre Adresse E-mail" required>
-                    </div>
-
                     <div class="input-row">
                         <div class="form-group" style="flex: 1;">
                             <label>Âge</label>
@@ -285,7 +280,7 @@
                 <div id="premium-box" style="background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 10px; margin-top: 8px; text-align: center;">
                     <h4 style="color: #d35400; margin-bottom: 2px; font-size: 13px;">⭐ Abonnement Premium</h4>
                     <p style="font-size: 10px; color: #666; margin-bottom: 6px;">Nécessaire après vos 10 likes gratuits quotidiens.</p>
-                    <button id="btn-acheter" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="acheterPremium()">Activer l'abonnement (9,99€)</button>
+                    <button id="btn-acheter" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="window.location.href='https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000';">Activer l'abonnement (9,99€)</button>
                 </div>
                 <button type="button" class="btn-main" style="background: #d9534f; margin-top: 10px; padding: 9px;" onclick="deconnecter()">🚪 Se déconnecter</button>
             </div>
@@ -343,7 +338,52 @@
             }
         }
 
-        // Connexion Google
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById("login-email").value.trim();
+            if (!email) { alert("Veuillez entrer votre adresse e-mail."); return; }
+            currentUser = email.split('@')[0];
+            userGender = "homme";
+            
+            document.getElementById("user-display-name").innerText = `${currentUser} (${userGender})`;
+            document.getElementById("user-city-view").innerText = "Paris";
+            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
+            
+            document.getElementById("bottom-nav").style.display = "flex";
+            socket.emit('register_user', { name: currentUser, email: email, gender: userGender, photo: userPhotoBase64, isPremium: isUserPremium });
+            switchTab("swipe", document.getElementById("nav-swipe"));
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById("reg-name").value.trim();
+            const age = document.getElementById("reg-age").value.trim();
+            const city = document.getElementById("reg-city").value.trim();
+            const gender = document.getElementById("reg-gender").value;
+            const lookingFor = document.getElementById("reg-looking").value;
+            const bio = document.getElementById("reg-bio").value.trim();
+
+            if (!name) { alert("Veuillez inscrire votre prénom."); return; }
+
+            currentUser = name;
+            userGender = gender;
+            document.getElementById("user-display-name").innerText = `${name}, ${age || '25'} ans (${gender})`;
+            document.getElementById("user-city-view").innerText = city || 'Paris';
+            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
+
+            if (gender === 'femme') {
+                document.getElementById("premium-box").style.display = "none";
+                document.getElementById("badge-status").innerText = "Compte Gratuit (Illimité)";
+            } else {
+                document.getElementById("premium-box").style.display = "block";
+                document.getElementById("badge-status").innerText = "Standard (10 likes/j)";
+            }
+
+            document.getElementById("bottom-nav").style.display = "flex";
+            socket.emit('register_user', { name, age, city, gender, lookingFor, bio, photo: userPhotoBase64, isPremium: isUserPremium });
+            switchTab("swipe", document.getElementById("nav-swipe"));
+        }
+
         function handleGoogleResponse(response) {
             try {
                 const base64Url = response.credential.split('.')[1];
@@ -352,14 +392,12 @@
                 const googleUser = JSON.parse(jsonPayload);
 
                 document.getElementById("reg-name").value = googleUser.given_name || googleUser.name;
-                document.getElementById("reg-email").value = googleUser.email || "";
                 if (googleUser.picture) {
                     userPhotoBase64 = googleUser.picture;
                     document.getElementById("reg-photo-preview").style.backgroundImage = `url('${userPhotoBase64}')`;
                 }
-                // Basculer automatiquement sur l'onglet inscription rempli
                 switchAuthMode('register');
-                alert(`Bienvenue ${googleUser.name} ! Vérifiez vos infos et cliquez sur "Créer mon compte".`);
+                alert(`Bienvenue ${googleUser.name} ! Complétez les dernières infos si besoin et validez.`);
             } catch(e) {
                 console.error("Erreur connexion Google", e);
             }
@@ -420,7 +458,7 @@
         });
 
         socket.on('receive_like_notification', (data) => {
-            alert(`💖 ${data.senderName} vous a envoyé un Like ! Likez-le en retour pour débloquer le chat.`);
+            alert(`💖 ${data.senderName} vous a envoyé un Like ! Likés-le en retour pour débloquer le chat.`);
         });
 
         socket.on('error_message', (data) => {
@@ -448,53 +486,6 @@
             document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
             document.getElementById("view-" + tabName).classList.add("active");
             if (element) element.classList.add("active");
-        }
-
-        function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById("login-email").value.trim();
-            if (!email) { alert("Veuillez entrer votre adresse e-mail."); return; }
-            currentUser = email.split('@')[0];
-            userGender = "homme";
-            
-            document.getElementById("user-display-name").innerText = `${currentUser} (${userGender})`;
-            document.getElementById("user-city-view").innerText = "Paris";
-            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
-            
-            document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name: currentUser, email: email, gender: userGender, photo: userPhotoBase64, isPremium: isUserPremium });
-            switchTab("swipe", document.getElementById("nav-swipe"));
-        }
-
-        function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById("reg-name").value.trim();
-            const email = document.getElementById("reg-email").value.trim();
-            const age = document.getElementById("reg-age").value.trim();
-            const city = document.getElementById("reg-city").value.trim();
-            const gender = document.getElementById("reg-gender").value;
-            const lookingFor = document.getElementById("reg-looking").value;
-            const bio = document.getElementById("reg-bio").value.trim();
-
-            if (!name || !email) { alert("Veuillez renseigner votre prénom et votre e-mail."); return; }
-
-            currentUser = name;
-            userGender = gender;
-            document.getElementById("user-display-name").innerText = `${name}, ${age || '25'} ans (${gender})`;
-            document.getElementById("user-city-view").innerText = city || 'Paris';
-            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
-
-            if (gender === 'femme') {
-                document.getElementById("premium-box").style.display = "none";
-                document.getElementById("badge-status").innerText = "Compte Gratuit (Illimité)";
-            } else {
-                document.getElementById("premium-box").style.display = "block";
-                document.getElementById("badge-status").innerText = "Standard (10 likes/j)";
-            }
-
-            document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name, email, age, city, gender, lookingFor, bio, photo: userPhotoBase64, isPremium: isUserPremium });
-            switchTab("swipe", document.getElementById("nav-swipe"));
         }
 
         function deconnecter() {
@@ -574,3 +565,145 @@
                     type: 'text' 
                 });
                 input.value = "";
+            }
+        }
+
+        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        async function toggleRecordVoice() {
+            const btn = document.getElementById('btn-record');
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => {
+                            socket.emit('send_message', { author: currentUser, audioUrl: reader.result, type: 'voice' });
+                        };
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.style.background = '#e74c3c';
+                    btn.innerText = "⏹️";
+                } catch(e) {
+                    alert("Impossible d'accéder au micro.");
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.style.background = 'var(--green-btn)';
+                btn.innerText = "🎤";
+            }
+        }
+
+        let peerConnection;
+        let localStream;
+        const servers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        async function startCall(type) {
+            if (!allUsers || allUsers.length === 0) {
+                alert("Aucun correspondant disponible pour l'appel.");
+                return;
+            }
+            const target = allUsers[0];
+            document.getElementById('call-modal').style.display = 'flex';
+            document.getElementById('call-status-text').innerText = `Appel de ${target.name}...`;
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+
+                peerConnection = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                peerConnection.ontrack = event => {
+                    document.getElementById('remoteVideo').srcObject = event.streams[0];
+                };
+
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.emit('ice_candidate', { targetName: target.name, candidate: event.candidate });
+                    }
+                };
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                socket.emit('start_call', { callerName: currentUser, targetName: target.name, offer: offer, callType: type });
+            } catch(e) {
+                console.error("Erreur d'appel", e);
+                endCall();
+            }
+        }
+
+        socket.on('incoming_call', async (data) => {
+            document.getElementById('call-modal').style.display = 'flex';
+            document.getElementById('call-status-text').innerText = `Appel entrant de ${data.callerName}...`;
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: data.callType === 'video', audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+
+                peerConnection = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                peerConnection.ontrack = event => {
+                    document.getElementById('remoteVideo').srcObject = event.streams[0];
+                };
+
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.emit('ice_candidate', { targetName: data.callerName, candidate: event.candidate });
+                    }
+                };
+
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.emit('make_answer', { targetName: data.callerName, answer: answer });
+            } catch(e) {
+                console.error("Erreur réception appel", e);
+                endCall();
+            }
+        });
+
+        socket.on('call_answered', async (data) => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        });
+
+        socket.on('ice_candidate', async (data) => {
+            if (peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        });
+
+        socket.on('call_ended', () => {
+            endCall(false);
+        });
+
+        function endCall(notify = true) {
+            if (notify && allUsers.length > 0) {
+                socket.emit('end_call', { targetName: allUsers[0].name });
+            }
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (peerConnection) peerConnection.close();
+            document.getElementById('call-modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
