@@ -356,23 +356,27 @@ async function register(){
 }
 
 async function login(){
-    const email = document.getElementById("loginEmail").value.trim();
-    if(!email){
-        alert("Veuillez entrer votre email.");
+    const emailInput = document.getElementById("loginEmail").value.trim();
+    if(!emailInput){
+        alert("Veuillez entrer votre prénom ou votre email.");
         return;
     }
 
-    currentUser = email.split('@')[0];
+    // Accepte aussi bien un prénom ("ANA") qu'un email ("ana@gmail.com")
+    currentUser = emailInput.includes('@') ? emailInput.split('@')[0] : emailInput;
 
+    // Remplissage propre de l'onglet profil
     document.getElementById("profile-name-view").innerText = currentUser;
-    document.getElementById("profile-details-view").innerText = "25 ans • homme";
+    document.getElementById("profile-details-view").innerText = "25 ans • Homme";
     document.getElementById("profile-city-view").innerText = "📍 Paris";
-    document.getElementById("profile-bio-view").innerText = "Connecté via email";
+    document.getElementById("profile-bio-view").innerText = "Membre Amour & Cie";
 
+    // Masquer le formulaire et afficher le swipe + la barre du bas
     document.getElementById("authContainer").style.display = "none";
     document.getElementById("bottom-nav").style.display = "flex";
     switchTab('swipe', document.getElementById('nav-swipe'));
 
+    // Inscription instantanée au Socket
     socket.emit("register_user", { name: currentUser, gender: 'homme' });
 }
 
