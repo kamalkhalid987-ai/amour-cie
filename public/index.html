@@ -563,9 +563,12 @@ function sendMessage() {
             peerConnection = new RTCPeerConnection(servers);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-            peerConnection.ontrack = event => {
-                document.getElementById('remoteVideo').srcObject = event.streams[0];
-            };
+           peerConnection.ontrack = event => {
+    const remoteVideo = document.getElementById('remoteVideo');
+    if (remoteVideo.srcObject !== event.streams[0]) {
+        remoteVideo.srcObject = event.streams[0];
+    }
+};
 
             peerConnection.onicecandidate = event => {
                 if (event.candidate) {
@@ -588,7 +591,10 @@ function sendMessage() {
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
                 peerConnection.ontrack = event => {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
+                    const remoteVideo = document.getElementById('remoteVideo');
+if (remoteVideo.srcObject !== event.streams[0]) {
+    remoteVideo.srcObject = event.streams[0];
+}
                 };
 
                 peerConnection.onicecandidate = event => {
