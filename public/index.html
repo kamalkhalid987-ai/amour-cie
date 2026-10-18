@@ -1,478 +1,427 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amour & Cie - Rencontres</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        :root {
-            --primary: #c95d43;
-            --primary-hover: #b24d35;
-            --secondary: #2d2a29;
-            --bg-color: #e5ded6;
-            --card-bg: #ffffff;
-            --green-btn: #4e7361;
-            --danger-btn: #d9534f;
-            --gold: #f39c12;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌹 Amour & Cie</title>
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+<style>
 
-        body {
-            background-color: var(--bg-color);
-            display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; padding: 10px; color: var(--secondary);
-        }
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Segoe UI,sans-serif;
+}
 
-        .app-container {
-            width: 100%; max-width: 420px; height: 740px;
-            background: var(--card-bg); border-radius: 28px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
-            display: flex; flex-direction: column; overflow: hidden; position: relative;
-        }
+body{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(
+        135deg,
+        #ff4458,
+        #ff6b81,
+        #ff8e53
+    );
+}
 
-        .app-header {
-            padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
-            background: #fff; border-bottom: 1px solid #f0f0f0;
-        }
+.container{
+    width:100%;
+    max-width:420px;
+    padding:20px;
+}
 
-        .app-logo { font-size: 18px; font-weight: 800; color: var(--primary); }
+.card{
+    background:white;
+    border-radius:25px;
+    padding:30px;
+    box-shadow:0 20px 40px rgba(0,0,0,.15);
+}
 
-        .view-content { flex: 1; display: flex; flex-direction: column; padding: 12px 15px; overflow-y: auto; }
-        .view-panel { display: none; flex-direction: column; height: 100%; }
-        .view-panel.active { display: flex; }
+.logo{
+    text-align:center;
+    margin-bottom:20px;
+}
 
-        .form-group { margin-bottom: 8px; display: flex; flex-direction: column; gap: 3px; }
-        .form-group label { font-size: 11px; font-weight: 600; color: #666; }
+.logo h1{
+    color:#ff4458;
+}
 
-        input, select, textarea, button {
-            width: 100%; padding: 9px; border-radius: 10px; border: 1px solid #ddd; font-size: 13px; outline: none;
-        }
+.tabs{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+}
 
-        .input-row { display: flex; gap: 6px; }
+.tabs button{
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:12px;
+    font-weight:bold;
+    cursor:pointer;
+}
 
-        .btn-main { background: var(--primary); color: white; border: none; font-weight: 700; cursor: pointer; }
-        .btn-green { background: var(--green-btn); color: white; border: none; font-weight: 700; cursor: pointer; }
-        .btn-gold { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; border: none; font-weight: 700; cursor: pointer; }
+.active{
+    background:#ff4458;
+    color:white;
+}
 
-        .btn-gps {
-            width: auto; white-space: nowrap; background: var(--green-btn);
-            color: white; border: none; cursor: pointer; font-size: 12px; padding: 0 12px; border-radius: 10px;
-        }
+.inactive{
+    background:#eeeeee;
+}
 
-        .photo-picker-box { display: flex; flex-direction: column; align-items: center; margin: 8px 0; }
-        .photo-preview {
-            width: 90px; height: 90px; border-radius: 50%; background-size: cover;
-            background-position: center; border: 3px solid var(--primary); margin-bottom: 6px; background-color: #eee;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
+.form{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
 
-        .swipe-card {
-            flex: 1; background: #fff; border-radius: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-            border: 1px solid #f0f0f0; display: flex; flex-direction: column; overflow: hidden; position: relative;
-        }
-        .photo-container {
-            flex: 1; background-size: cover; background-position: center; position: relative;
-            display: flex; align-items: flex-end; padding: 15px; min-height: 240px;
-        }
-        .photo-overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%);
-        }
-        .profile-info { position: relative; z-index: 2; color: white; }
-        .profile-name { font-size: 20px; font-weight: 800; }
-        .profile-details { padding: 10px; background: white; }
-        .profile-bio { font-size: 12px; color: #666; line-height: 1.3; }
+input,select,textarea{
+    width:100%;
+    padding:12px;
+    border:1px solid #ddd;
+    border-radius:10px;
+}
 
-        .swipe-actions { display: flex; justify-content: space-around; padding: 8px 0; }
-        .action-btn {
-            width: 48px; height: 48px; border-radius: 50%; border: none;
-            display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .btn-pass { background: #fff; color: #e74c3c; border: 1px solid #fee; }
-        .btn-like { background: #2ecc71; color: #fff; }
+textarea{
+    resize:none;
+}
 
-        .chat-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .call-buttons { display: flex; gap: 6px; }
-        .btn-call { padding: 5px 10px; font-size: 11px; border-radius: 8px; border: none; cursor: pointer; color: white; font-weight: bold; }
-        .btn-audio-call { background: #3498db; }
-        .btn-video-call { background: #9b59b6; }
+.submit{
+    background:#ff4458;
+    color:white;
+    border:none;
+    padding:14px;
+    border-radius:30px;
+    font-size:16px;
+    cursor:pointer;
+}
 
-        .chat-box {
-            flex: 1; border: 1px solid #eee; border-radius: 12px; padding: 10px;
-            overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; margin-bottom: 8px;
-        }
-        .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.3; }
-        .msg.me { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
-        .msg.other { align-self: flex-start; background: #e5e5ea; color: #000; border-bottom-left-radius: 2px; }
-        .msg-author { font-size: 10px; opacity: 0.8; margin-bottom: 2px; font-weight: bold; }
-        
-        .chat-input-row { display: flex; gap: 6px; align-items: center; }
-        .chat-input-row input { flex: 1; }
-        .chat-input-row button { width: auto; padding: 0 10px; font-size: 12px; height: 36px; }
+.submit:hover{
+    background:#e63950;
+}
 
-        #call-modal {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85); z-index: 100; display: none;
-            flex-direction: column; align-items: center; justify-content: center; color: white; padding: 20px; text-align: center;
-        }
-        #call-videos { display: flex; gap: 10px; margin-bottom: 20px; width: 100%; justify-content: center; }
-        video { width: 140px; height: 180px; background: #000; border-radius: 10px; object-fit: cover; }
-        video#localVideo { transform: scaleX(-1); }
+.hidden{
+    display:none;
+}
 
-        .bottom-nav { display: flex; background: #fff; border-top: 1px solid #eee; padding: 8px 0; }
-        .nav-item {
-            flex: 1; display: flex; flex-direction: column; align-items: center;
-            justify-content: center; font-size: 11px; color: #888; cursor: pointer; gap: 3px;
-        }
-        .nav-item.active { color: var(--primary); font-weight: bold; }
-        .nav-icon { font-size: 16px; }
-    </style>
+#status{
+    margin-top:15px;
+    text-align:center;
+    color:green;
+}
+
+.photo-preview{
+    width:100px;
+    height:100px;
+    border-radius:50%;
+    background:#eee;
+    margin:auto;
+    background-size:cover;
+    background-position:center;
+}
+
+</style>
 </head>
 <body>
 
-    <div class="app-container">
-        <!-- HEADER -->
-        <div class="app-header">
-            <div class="app-logo">🌹 Amour & Cie</div>
-            <div id="badge-status" style="font-size: 11px; font-weight: bold; color: var(--green-btn);">Standard</div>
-        </div>
+<div class="container">
 
-        <div class="view-content">
+<div class="card">
 
-            <!-- 1. VUE ACCUEIL (CONNEXION / INSCRIPTION) -->
-            <div id="view-auth" class="view-panel active">
-                <h3 style="text-align: center; margin-bottom: 15px; color: var(--primary); font-size: 18px;">Bienvenue sur Amour & Cie 💖</h3>
+<div class="logo">
+<h1>🌹 Amour & Cie</h1>
+<p>Trouvez votre moitié</p>
+</div>
 
-                <!-- Onglets -->
-                <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
-                    <button id="btn-tab-login" type="button" onclick="switchAuthMode('login')" style="padding: 8px 16px; font-weight: bold; background-color: var(--primary); color: white; border: none; border-radius: 20px; cursor: pointer;">Se connecter</button>
-                    <button id="btn-tab-register" type="button" onclick="switchAuthMode('register')" style="padding: 8px 16px; background-color: #e0e0e0; color: #333; border: none; border-radius: 20px; cursor: pointer;">S'inscrire</button>
-                </div>
+<div class="tabs">
 
-                <!-- Formulaire de Connexion E-mail -->
-                <form id="login-form" onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 12px;">
-                    <div class="form-group">
-                        <label>Adresse E-mail</label>
-                        <input type="email" id="login-email" placeholder="votre.email@exemple.com" required>
-                    </div>
-                    <button type="submit" class="btn-main" style="padding: 10px;">Se connecter</button>
-                </form>
+<button id="btnLogin"
+class="active"
+onclick="showLogin()">
+Connexion
+</button>
 
-                <!-- Formulaire d'Inscription -->
-                <form id="register-form" onsubmit="handleRegister(event)" style="display: none; flex-direction: column; gap: 8px;">
-                    <div class="photo-picker-box">
-                        <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80')"></div>
-                        <input type="file" id="gallery-file" accept="image/*" style="display: none;" onchange="chargerPhotoGalerie(event)">
-                        <button type="button" class="btn-gps" onclick="document.getElementById('gallery-file').click()">Choisir une photo</button>
-                    </div>
+<button id="btnRegister"
+class="inactive"
+onclick="showRegister()">
+Inscription
+</button>
 
-                    <div class="form-group">
-                        <label>Prénom</label>
-                        <input type="text" id="reg-name" placeholder="Votre prénom" required>
-                    </div>
+</div>
 
-                    <div class="form-group">
-                        <label>Adresse E-mail</label>
-                        <input type="email" id="reg-email" placeholder="votre.email@exemple.com" required>
-                    </div>
+<!-- CONNEXION -->
 
-                    <div class="input-row">
-                        <div class="form-group" style="flex: 1;">
-                            <label>Âge</label>
-                            <input type="number" id="reg-age" placeholder="25" value="25">
-                        </div>
-                        <div class="form-group" style="flex: 2;">
-                            <label>Ville</label>
-                            <div style="display: flex; gap: 4px;">
-                                <input type="text" id="reg-city" placeholder="Votre ville">
-                                <button type="button" class="btn-gps" onclick="obtenirGeolocalisation()">📍 GPS</button>
-                            </div>
-                        </div>
-                    </div>
+<div id="loginView">
 
-                    <div class="input-row">
-                        <div class="form-group" style="flex: 1;">
-                            <label>Je suis :</label>
-                            <select id="reg-gender">
-                                <option value="homme">Un Homme</option>
-                                <option value="femme">Une Femme</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label>Je cherche :</label>
-                            <select id="reg-looking">
-                                <option value="femme">Une Femme</option>
-                                <option value="homme">Un Homme</option>
-                            </select>
-                        </div>
-                    </div>
+<div class="form">
 
-                    <div class="form-group">
-                        <label>Bio / Description</label>
-                        <textarea id="reg-bio" rows="2" placeholder="Quelques mots sur vous..."></textarea>
-                    </div>
+<input
+type="email"
+id="loginEmail"
+placeholder="Adresse email">
 
-                    <button type="submit" class="btn-main" style="padding: 10px; margin-top: 5px;">Créer mon compte</button>
-                </form>
-            </div>
+<input
+type="password"
+id="loginPassword"
+placeholder="Mot de passe">
 
-            <!-- 2. VUE SWIPE -->
-            <div id="view-swipe" class="view-panel">
-                <div class="swipe-card" id="card-container">
-                    <div id="card-photo" class="photo-container" style="background-image: url('');">
-                        <div class="photo-overlay"></div>
-                        <div class="profile-info">
-                            <div class="profile-name"><span id="card-name">Recherche...</span>, <span id="card-age">--</span> ans</div>
-                            <div style="font-size: 12px; opacity: 0.9;">📍 <span id="card-city">--</span></div>
-                        </div>
-                    </div>
-                    <div class="profile-details">
-                        <div class="profile-bio" id="card-bio">En attente d'autres célibataires...</div>
-                    </div>
-                </div>
+<button
+class="submit"
+onclick="login()">
+Se connecter
+</button>
 
-                <div class="swipe-actions">
-                    <button type="button" class="action-btn btn-pass" onclick="swiperProfil(false)">❌</button>
-                    <button type="button" class="action-btn btn-like" onclick="swiperProfil(true)">❤️</button>
-                </div>
-            </div>
+</div>
 
-            <!-- 3. VUE CHAT -->
-            <div id="view-chat" class="view-panel">
-                <div class="chat-header-actions">
-                    <h3 style="font-size: 15px;">Discussion</h3>
-                    <div class="call-buttons">
-                        <button class="btn-call btn-audio-call" onclick="startCall('audio')">📞 Appel Audio</button>
-                        <button class="btn-call btn-video-call" onclick="startCall('video')">📹 Vidéo</button>
-                    </div>
-                </div>
-                
-                <div class="chat-box" id="chat-messages">
-                    <div class="msg other">
-                        <div class="msg-author">Système</div>
-                        Discutez, envoyez des vocaux et appelez vos matchs en direct !
-                    </div>
-                </div>
+</div>
 
-                <div class="chat-input-row">
-                    <input type="text" id="msg-input" placeholder="Votre message..." onkeypress="handleKeyPress(event)">
-                    <button type="button" class="btn-main" onclick="sendMessage()">Envoyer</button>
-                    <button type="button" class="btn-green" id="btn-record" onclick="toggleRecordVoice()" title="Enregistrer un vocal">🎤</button>
-                </div>
-            </div>
+<!-- INSCRIPTION -->
 
-            <!-- 4. VUE PROFIL -->
-            <div id="view-profile" class="view-panel">
-                <h3 style="margin-bottom: 12px; font-size: 16px; text-align: center;">Mon Compte</h3>
-                <div class="photo-picker-box">
-                    <div id="user-photo-view" class="photo-preview"></div>
-                    <h4 id="user-display-name" style="margin-top: 5px; font-size: 16px;"></h4>
-                    <p id="user-city-view" style="font-size: 12px; color: #666; margin-top: 2px;"></p>
-                    <p id="user-bio-view" style="font-size: 12px; color: #444; margin-top: 8px; text-align: center; font-style: italic;"></p>
-                </div>
+<div id="registerView" class="hidden">
 
-                <div id="premium-box" style="background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 10px; margin-top: 10px; text-align: center;">
-                    <h4 style="color: #d35400; margin-bottom: 2px; font-size: 13px;">⭐ Abonnement Premium</h4>
-                    <p style="font-size: 10px; color: #666; margin-bottom: 6px;">Nécessaire après vos 10 likes gratuits quotidiens.</p>
-                    <button id="btn-acheter" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="window.location.href='https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000';">Activer l'abonnement (9,99€)</button>
-                </div>
+<div class="form">
 
-                <button type="button" class="btn-main" style="background: #d9534f; margin-top: 20px; padding: 10px;" onclick="deconnecter()">🚪 Se déconnecter</button>
-            </div>
+<div
+class="photo-preview"
+id="preview">
+</div>
 
-        </div>
+<input
+type="file"
+accept="image/*"
+onchange="previewPhoto(event)">
 
-        <!-- MODALE APPEL -->
-        <div id="call-modal">
-            <h3 id="call-status-text" style="margin-bottom: 10px;">Appel en cours...</h3>
-            <div id="call-videos">
-                <video id="localVideo" autoplay muted playsinline></video>
-                <video id="remoteVideo" autoplay playsinline></video>
-            </div>
-            <button type="button" class="btn-main" style="background: var(--danger-btn); width: 120px;" onclick="endCall()">Raccrocher</button>
-        </div>
+<input
+type="text"
+id="name"
+placeholder="Prénom">
 
-        <!-- NAVBAR -->
-        <div class="bottom-nav" id="bottom-nav" style="display: none;">
-            <div class="nav-item active" id="nav-swipe" onclick="switchTab('swipe', this)"><div class="nav-icon">🔥</div><span>Découvrir</span></div>
-            <div class="nav-item" id="nav-chat" onclick="switchTab('chat', this)"><div class="nav-icon">💬</div><span>Messages</span></div>
-            <div class="nav-item" id="nav-profile" onclick="switchTab('profile', this)"><div class="nav-icon">👤</div><span>Profil</span></div>
-        </div>
-    </div>
+<input
+type="email"
+id="email"
+placeholder="Adresse email">
 
-    <script>
-        const STRIPE_PREMIUM_LINK = "https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000";
-        const socket = io();
-        let currentUser = "";
-        let userAge = "25";
-        let userCity = "Paris";
-        let userGender = "homme";
-        let userBio = "";
-        let userPhotoBase64 = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80";
-        let isUserPremium = false;
-        let allUsers = [];
-        let currentProfileIndex = 0;
+<input
+type="password"
+id="password"
+placeholder="Mot de passe">
 
-        function switchAuthMode(mode) {
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const btnLogin = document.getElementById('btn-tab-login');
-            const btnRegister = document.getElementById('btn-tab-register');
+<input
+type="password"
+id="confirmPassword"
+placeholder="Confirmation mot de passe">
 
-            if (mode === 'login') {
-                loginForm.style.display = 'flex';
-                registerForm.style.display = 'none';
-                btnLogin.style.backgroundColor = 'var(--primary)';
-                btnLogin.style.color = 'white';
-                btnRegister.style.backgroundColor = '#e0e0e0';
-                btnRegister.style.color = '#333';
-            } else {
-                loginForm.style.display = 'none';
-                registerForm.style.display = 'flex';
-                btnRegister.style.backgroundColor = 'var(--primary)';
-                btnRegister.style.color = 'white';
-                btnLogin.style.backgroundColor = '#e0e0e0';
-                btnLogin.style.color = '#333';
-            }
-        }
+<input
+type="number"
+id="age"
+placeholder="Âge">
 
-        function miseAJourVueProfil() {
-            document.getElementById("user-display-name").innerText = `${currentUser}, ${userAge} ans (${userGender})`;
-            document.getElementById("user-city-view").innerText = `📍 ${userCity}`;
-            document.getElementById("user-bio-view").innerText = userBio ? `"${userBio}"` : "";
-            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
-        }
+<input
+type="text"
+id="city"
+placeholder="Ville">
 
-        function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById("login-email").value.trim();
-            if (!email) return;
+<select id="gender">
+<option value="homme">👨 Homme</option>
+<option value="femme">👩 Femme</option>
+</select>
 
-            currentUser = email.split('@')[0];
-            userAge = "25";
-            userCity = "Paris";
-            userGender = "homme";
-            userBio = "";
+<select id="lookingFor">
+<option value="femme">👩 Recherche femme</option>
+<option value="homme">👨 Recherche homme</option>
+</select>
 
-            miseAJourVueProfil();
+<textarea
+id="bio"
+rows="3"
+placeholder="Votre description">
+</textarea>
 
-            document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name: currentUser, email: email, age: userAge, city: userCity, gender: userGender, photo: userPhotoBase64, isPremium: isUserPremium });
-            switchTab("swipe", document.getElementById("nav-swipe"));
-        }
+<button
+class="submit"
+onclick="register()">
+Créer mon compte
+</button>
 
-        function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById("reg-name").value.trim();
-            const email = document.getElementById("reg-email").value.trim();
-            const age = document.getElementById("reg-age").value.trim();
-            const city = document.getElementById("reg-city").value.trim();
-            const gender = document.getElementById("reg-gender").value;
-            const lookingFor = document.getElementById("reg-looking").value;
-            const bio = document.getElementById("reg-bio").value.trim();
+</div>
 
-            if (!name || !email) return;
+</div>
 
-            currentUser = name;
-            userAge = age || "25";
-            userCity = city || "Paris";
-            userGender = gender;
-            userBio = bio;
+<div id="status"></div>
 
-            miseAJourVueProfil();
+</div>
 
-            if (gender === 'femme') {
-                document.getElementById("premium-box").style.display = "none";
-                document.getElementById("badge-status").innerText = "Gratuit";
-            } else {
-                document.getElementById("premium-box").style.display = "block";
-                document.getElementById("badge-status").innerText = "Standard (10 likes/j)";
-            }
+</div>
 
-            document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name, email, age: userAge, city: userCity, gender, lookingFor, bio, photo: userPhotoBase64, isPremium: isUserPremium });
-            switchTab("swipe", document.getElementById("nav-swipe"));
-        }
+<script>
 
-        function chargerPhotoGalerie(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    userPhotoBase64 = e.target.result;
-                    document.getElementById("reg-photo-preview").style.backgroundImage = `url('${userPhotoBase64}')`;
-                };
-                reader.readAsDataURL(file);
-            }
-        }
+function showLogin(){
 
-        function obtenirGeolocalisation() {
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        try {
-                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                            const data = await res.json();
-                            const city = data.address.city || data.address.town || data.address.village || "Ma ville";
-                            document.getElementById("reg-city").value = city;
-                        } catch(e) {
-                            document.getElementById("reg-city").value = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-                        }
-                    }
-                );
-            }
-        }
+document.getElementById("loginView")
+.classList.remove("hidden");
 
-        socket.on('update_users_list', (users) => {
-            allUsers = users.filter(u => u.name !== currentUser);
-            currentProfileIndex = 0;
-            afficherProfilCourant();
-        });
+document.getElementById("registerView")
+.classList.add("hidden");
 
-        socket.on('like_limit_reached', (data) => {
-            alert(data.message);
-            switchTab('profile', document.getElementById('nav-profile'));
-        });
+btnLogin.className="active";
+btnRegister.className="inactive";
 
-        socket.on('match_success', (data) => {
-            alert(`🎉 C'est un Match avec ${data.targetName} ! Vous pouvez discuter et l'appeler.`);
-            switchTab('chat', document.getElementById('nav-chat'));
-        });
+}
 
-        socket.on('receive_like_notification', (data) => {
-            alert(`💖 ${data.senderName} vous a envoyé un Like ! Likez-le en retour pour débloquer le chat.`);
-        });
+function showRegister(){
 
-        socket.on('error_message', (data) => {
-            alert(data.message);
-        });
+document.getElementById("registerView")
+.classList.remove("hidden");
 
-        socket.on('receive_message', (data) => {
-            const chatBox = document.getElementById('chat-messages');
-            const isMe = data.author === currentUser;
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `msg ${isMe ? 'me' : 'other'}`;
-            
-            let contentHTML = data.text;
-            if (data.type === 'voice') {
-                contentHTML = `<audio controls src="${data.audioUrl}" style="height:32px; width:180px;"></audio>`;
-            }
+document.getElementById("loginView")
+.classList.add("hidden");
 
-            msgDiv.innerHTML = `<div class="msg-author">${data.author}</div>${contentHTML}`;
-            chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        });
+btnRegister.className="active";
+btnLogin.className="inactive";
 
-        function switchTab(tabName, element) {
-            document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
-            document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-            document.getElementById("view-" + tabName).classList.add("active");
-            if (element) element.classList.add("active");
-        }
+}
 
-        function deconnecter() {
+function previewPhoto(event){
+
+const file =
+event.target.files[0];
+
+if(!file) return;
+
+const reader =
+new FileReader();
+
+reader.onload=function(e){
+
+document.getElementById("preview")
+.style.backgroundImage=
+`url('${e.target.result}')`;
+
+}
+
+reader.readAsDataURL(file);
+
+}
+
+async function register(){
+
+const password =
+document.getElementById("password").value;
+
+const confirm =
+document.getElementById("confirmPassword").value;
+
+if(password !== confirm){
+
+alert(
+"Les mots de passe ne correspondent pas."
+);
+
+return;
+
+}
+
+const response =
+await fetch("/register",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+name:
+document.getElementById("name").value,
+
+email:
+document.getElementById("email").value,
+
+password:
+password,
+
+age:
+document.getElementById("age").value,
+
+city:
+document.getElementById("city").value,
+
+gender:
+document.getElementById("gender").value,
+
+lookingFor:
+document.getElementById("lookingFor").value,
+
+bio:
+document.getElementById("bio").value
+
+})
+
+});
+
+const data =
+await response.json();
+
+document.getElementById("status")
+.innerText =
+data.message ||
+"Compte créé";
+
+}
+
+async function login(){
+
+const response =
+await fetch("/login",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+email:
+document.getElementById("loginEmail").value,
+
+password:
+document.getElementById("loginPassword").value
+
+})
+
+});
+
+const data =
+await response.json();
+
+if(data.success){
+
+localStorage.setItem(
+"user",
+JSON.stringify(data)
+);
+
+window.location.href =
+"/app.html";
+
+}else{
+
+alert(
+data.message ||
+"Connexion impossible"
+);
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
