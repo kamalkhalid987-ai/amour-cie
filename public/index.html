@@ -131,7 +131,7 @@ textarea{
     border: 3px solid #ff4458;
 }
 
-/* Vues additionnelles swipe/chat/profil */
+/* Vues additionnelles */
 .view-panel { display: none; flex-direction: column; flex: 1; overflow-y: auto; }
 .view-panel.active { display: flex; }
 
@@ -261,7 +261,7 @@ textarea{
         </div>
     </div>
 
-    <!-- VUE PROFIL (Votre photo, nom, prénom, etc.) -->
+    <!-- VUE PROFIL -->
     <div id="view-profile" class="view-panel" style="align-items: center; text-align: center; justify-content: center;">
         <div class="photo-preview" id="profile-photo-view" style="width: 100px; height: 100px; margin-bottom: 15px;"></div>
         <h2 id="profile-name-view" style="color: #ff4458; margin-bottom: 5px;"></h2>
@@ -326,30 +326,33 @@ async function register(){
     const lookingFor = document.getElementById("lookingFor").value;
     const bio = document.getElementById("bio").value;
 
-    if(password !== confirm){
+    if(!name || !email){
+        alert("Veuillez remplir au moins le prénom et l'adresse e-mail.");
+        return;
+    }
+
+    if(password && confirm && password !== confirm){
         alert("Les mots de passe ne correspondent pas.");
         return;
     }
 
     currentUser = name;
 
-    // Remplir la vue Profil avec les infos saisies
+    // Mise à jour directe de la vue Profil
     document.getElementById("profile-name-view").innerText = name;
-    document.getElementById("profile-details-view").innerText = `${age} ans • ${gender}`;
-    document.getElementById("profile-city-view").innerText = `📍 ${city}`;
+    document.getElementById("profile-details-view").innerText = `${age || '25'} ans • ${gender}`;
+    document.getElementById("profile-city-view").innerText = `📍 ${city || 'Paris'}`;
     document.getElementById("profile-bio-view").innerText = bio ? `"${bio}"` : "Aucune bio";
     if(userPhotoBase64) {
         document.getElementById("profile-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
     }
 
-    // Afficher l'application principale et la navbar
-    document.getElementById("authContainer").classList.remove("active");
+    // Basculement immédiat vers l'application
     document.getElementById("authContainer").style.display = "none";
     document.getElementById("bottom-nav").style.display = "flex";
     switchTab('swipe', document.getElementById('nav-swipe'));
 
-    socket.emit("register_user", { name, gender });
-    document.getElementById("status").innerText = "Compte créé avec succès !";
+    socket.emit("register_user", { name, email, age, city, gender, lookingFor, bio, photo: userPhotoBase64 });
 }
 
 async function login(){
@@ -361,13 +364,11 @@ async function login(){
 
     currentUser = email.split('@')[0];
 
-    // Remplir la vue Profil par défaut
     document.getElementById("profile-name-view").innerText = currentUser;
     document.getElementById("profile-details-view").innerText = "25 ans • homme";
     document.getElementById("profile-city-view").innerText = "📍 Paris";
     document.getElementById("profile-bio-view").innerText = "Connecté via email";
 
-    document.getElementById("authContainer").classList.remove("active");
     document.getElementById("authContainer").style.display = "none";
     document.getElementById("bottom-nav").style.display = "flex";
     switchTab('swipe', document.getElementById('nav-swipe'));
@@ -377,7 +378,7 @@ async function login(){
 
 function switchTab(tabName, element) {
     document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
-    document.querySelectorAll(".nav-item").forEach(n => n.navItem && n.classList.remove("active") || n.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
     
     if(tabName === 'swipe') {
         document.getElementById("view-swipe").classList.add("active");
