@@ -144,44 +144,54 @@
 
         <div class="view-content">
 
-            <!-- 1. VUE INSCRIPTION / CONNEXION -->
-            <div id="view-auth" class="view-panel active">
-                <h3 style="text-align: center; margin-bottom: 6px; color: var(--primary); font-size: 16px;">Connexion ou Inscription</h3>
+          
 
-                <!-- BOUTON CONNEXION GOOGLE -->
-                <div style="display: flex; justify-content: center; margin-bottom: 6px;">
-                    <div id="g_id_onload"
-                         data-client_id="612038682112-je9l72mvtcv49daic2pt2aik8t3p0g5c.apps.googleusercontent.com"
-                         data-callback="handleGoogleResponse"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin" data-type="standard" data-size="large" data-text="signin_with" data-shape="rectangular"></div>
-                </div>
+                <!-- 1. VUE INSCRIPTION / CONNEXION -->
+        <div id="view-auth" class="view-panel active">
+            <h3 style="text-align: center; margin-bottom: 12px; color: var(--primary); font-size: 18px;">Bienvenue sur Amour & Cie 💖</h3>
 
-                <div style="text-align: center; font-size: 10px; color: #888; margin-bottom: 4px;">— OU —</div>
+            <!-- Boutons Onglets : Se connecter / S'inscrire -->
+            <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
+                <button id="btn-tab-login" type="button" onclick="switchAuthMode('login')" style="padding: 8px 16px; font-weight: bold; background-color: var(--primary); color: white; border: none; border-radius: 20px; cursor: pointer;">Se connecter</button>
+                <button id="btn-tab-register" type="button" onclick="switchAuthMode('register')" style="padding: 8px 16px; background-color: #e0e0e0; color: #333; border: none; border-radius: 20px; cursor: pointer;">S'inscrire</button>
+            </div>
 
+            <!-- 1. Formulaire de Connexion (E-mail) -->
+            <form id="login-form" onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="email" id="login-email" placeholder="Votre Adresse E-mail" required style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                <button type="submit" class="btn-main" style="padding: 10px;">Se connecter</button>
+            </form>
+
+            <!-- 2. Formulaire d'Inscription -->
+            <form id="register-form" onsubmit="handleRegister(event)" style="display: none; flex-direction: column; gap: 10px;">
                 <div class="photo-picker-box">
-                    <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80');"></div>
+                    <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80')"></div>
                     <input type="file" id="gallery-file" accept="image/*" style="display: none;" onchange="chargerPhotoGalerie(event)">
-                    <button type="button" class="btn-green" style="padding: 4px 10px; font-size: 11px; width: auto;" onclick="document.getElementById('gallery-file').click()">🖼️ Choisir une photo</button>
+                    <button type="button" class="btn-main btn-gps" onclick="document.getElementById('gallery-file').click()">Choisir une photo</button>
                 </div>
 
-                <div class="form-group">
-                    <label>Prénom</label>
-                    <input type="text" id="reg-name" placeholder="Votre prénom...">
-                </div>
+                <input type="text" id="reg-name" placeholder="Votre Prénom" required style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                <input type="email" id="reg-email" placeholder="Votre Adresse E-mail" required style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                
+                <select id="reg-gender" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                    <option value="homme">Homme</option>
+                    <option value="femme">Femme</option>
+                </select>
 
-                <div style="display: flex; gap: 8px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Âge</label>
-                        <input type="number" id="reg-age" placeholder="Ex: 28">
-                    </div>
-                    <div class="form-group" style="flex: 2;">
-                        <label>Ville</label>
-                        <div class="input-row">
-                            <input type="text" id="reg-city" placeholder="Ex: Paris">
-                            <button type="button" class="btn-gps" onclick="obtenirGeolocalisation()">📍 GPS</button>
-                        </div>
+                <button type="submit" class="btn-main" style="padding: 10px;">Créer mon compte</button>
+            </form>
+
+            <!-- Option Connexion Google -->
+            <div style="text-align: center; font-size: 12px; color: #888; margin: 15px 0 8px 0;">OU</div>
+            <div style="display: flex; justify-content: center;">
+                <div id="g_id_onload"
+                    data-client_id="612038682112-je9l72xvtcv49daic2pt2aik8t3p0g5c.apps.googleusercontent.com"
+                    data-callback="handleGoogleResponse"
+                    data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin" data-type="standard" data-size="large" data-text="signin_with" data-shape="rectangular"></div>
+            </div>
+        </div>
                     </div>
                 </div>
 
@@ -655,6 +665,57 @@ if (remoteVideo.srcObject !== event.streams[0]) {
             if (peerConnection) peerConnection.close();
             document.getElementById('call-modal').style.display = 'none';
         }
+        let currentAuthMode = 'login';
+
+function switchAuthMode(mode) {
+    currentAuthMode = mode;
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const btnLogin = document.getElementById('btn-tab-login');
+    const btnRegister = document.getElementById('btn-tab-register');
+
+    if (mode === 'login') {
+        loginForm.style.display = 'flex';
+        registerForm.style.display = 'none';
+        btnLogin.style.backgroundColor = 'var(--primary)';
+        btnLogin.style.color = 'white';
+        btnRegister.style.backgroundColor = '#e0e0e0';
+        btnRegister.style.color = '#333';
+    } else {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'flex';
+        btnRegister.style.backgroundColor = 'var(--primary)';
+        btnRegister.style.color = 'white';
+        btnLogin.style.backgroundColor = '#e0e0e0';
+        btnLogin.style.color = '#333';
+    }
+}
+
+function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    if (email) {
+        currentUser = email.split('@')[0];
+        socket.emit('register_user', { name: currentUser, email: email });
+        switchTab('swipe', document.getElementById('nav-swipe'));
+        document.getElementById('bottom-nav').style.display = 'flex';
+    }
+}
+
+function handleRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const gender = document.getElementById('reg-gender').value;
+
+    if (name && email) {
+        currentUser = name;
+        userGender = gender;
+        socket.emit('register_user', { name: name, email: email, gender: gender, photo: userPhotoBase64 });
+        switchTab('swipe', document.getElementById('nav-swipe'));
+        document.getElementById('bottom-nav').style.display = 'flex';
+    }
+}
     </script>
 </body>
 </html>
