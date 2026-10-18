@@ -192,7 +192,7 @@ textarea{
     <!-- CONTENEUR PRINCIPAL D'AUTHENTIFICATION -->
     <div id="authContainer" class="view-panel active">
         <div class="tabs">
-            <button id="btnLoginTab" class="active" onclick="showLogin()">Connexion</button>
+            <button id="btnLoginTab" class="active" onclick="login()">Connexion</button>
             <button id="btnRegisterTab" class="inactive" onclick="showRegister()">Inscription</button>
         </div>
 
@@ -210,7 +210,10 @@ textarea{
             <input type="password" id="password" placeholder="Mot de passe">
             <input type="password" id="confirmPassword" placeholder="Confirmation mot de passe">
             <input type="number" id="age" placeholder="Âge">
-            <input type="text" id="city" placeholder="Ville">
+            <div style="display: flex; gap: 5px;">
+    <input type="text" id="city" placeholder="Ville">
+    <button type="button" class="submit" style="width: auto; padding: 0 15px; border-radius: 10px; white-space: nowrap; font-size: 13px;" onclick="obtenirGeolocalisation()">📍 GPS</button>
+</div>
             <select id="gender">
                 <option value="homme">👨 Homme</option>
                 <option value="femme">👩 Femme</option>
@@ -483,6 +486,29 @@ socket.on('receive_like_notification', (data) => {
 socket.on('error_message', (data) => {
     alert(data.message);
 });
+    function obtenirGeolocalisation() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                    const data = await res.json();
+                    const city = data.address.city || data.address.town || data.address.village || "Ma ville";
+                    document.getElementById("city").value = city;
+                } catch(e) {
+                    document.getElementById("city").value = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+                }
+            },
+            (error) => {
+                alert("Impossible de récupérer la position GPS. Vérifiez les autorisations de votre navigateur.");
+            }
+        );
+    } else {
+        alert("La géolocalisation n'est pas prise en charge sur votre appareil.");
+    }
+}
 </script>
 
 </body>
