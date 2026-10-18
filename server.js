@@ -1,120 +1,448 @@
-const http = require('http');
-const express = require('express');
-const { Server } = require('socket.io');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
 
-app.use(express.static('public'));
+app.use(cors());
+app.use(express.json());
+app.use(express.static("public"));
 
-// Stockage des utilisateurs enregistrés et des likes/matches
-let registeredUsers = {}; // email/id -> userData
-let userLikes = {};       // fromUser -> Set(toUser)
-let userMatches = {};     // user -> Set(matchedUsers)
-let connectedSockets = {}; // socket.id -> email/id
-
-io.on('connection', (socket) => {
-    console.log('Utilisateur connecté :', socket.id);
-
-    // Inscription / Connexion
-    socket.on('register_user', (userData) => {
-        const userKey = userData.email || userData.name;
-        userData.socketId = socket.id;
-        
-        registeredUsers[userKey] = { ...registeredUsers[userKey], ...userData };
-        connectedSockets[socket.id] = userKey;
-
-        if (!userLikes[userKey]) userLikes[userKey] = new Set();
-        if (!userMatches[userKey]) userMatches[userKey] = new Set();
-
-        // Envoyer la liste actualisée à tout le monde
-        io.emit('update_users_list', Object.values(registeredUsers));
-        socket.emit('login_success', registeredUsers[userKey]);
-    });
-
-    // Gestion des Likes et Notifications
-    socket.on('send_like', (data) => {
-        const { senderName, targetName } = data;
-        if (!userLikes[senderName]) userLikes[senderName] = new Set();
-        userLikes[senderName].add(targetName);
-
-        // Trouver le socket du destinataire
-        const targetUser = Object.values(registeredUsers).find(u => u.name === targetName);
-        
-        // 1. Notification de Like reçue
-        if (targetUser && targetUser.socketId) {
-            io.to(targetUser.socketId).emit('receive_like_notification', { senderName });
-        }
-
-        // 2. Vérification de Match
-        if (userLikes[targetName] && userLikes[targetName].has(senderName)) {
-            if (!userMatches[senderName]) userMatches[senderName] = new Set();
-            if (!userMatches[targetName]) userMatches[targetName] = new Set();
-            
-            userMatches[senderName].add(targetName);
-            userMatches[targetName].add(senderName);
-
-            // Informer les deux personnes du Match
-            socket.emit('match_success', { targetName });
-            if (targetUser && targetUser.socketId) {
-                io.to(targetUser.socketId).emit('match_success', { targetName: senderName });
-            }
-        }
-    });
-
-    // Envoi de messages (Autorisé SEULEMENT si Match)
-    socket.on('send_message', (msgData) => {
-        const { author, targetName } = msgData;
-        const matches = userMatches[author];
-
-        if (matches && matches.has(targetName)) {
-            io.emit('receive_message', msgData);
-        } else {
-            socket.emit('error_message', { message: "Vous devez avoir un Match mutuel pour échanger des messages !" });
-        }
-    });
-
-    // WebRTC Signaling (Appels)
-    socket.on('call_user', (data) => {
-        const targetSocket = Object.values(registeredUsers).find(u => u.name === data.targetName);
-        if (targetSocket) {
-            io.to(targetSocket.socketId).emit('incoming_call', {
-                callerName: data.callerName,
-                offer: data.offer,
-                callType: data.callType
-            });
-        }
-    });
-
-    socket.on('make_answer', (data) => {
-        const targetSocket = Object.values(registeredUsers).find(u => u.name === data.targetName);
-        if (targetSocket) {
-            io.to(targetSocket.socketId).emit('call_answered', { answer: data.answer });
-        }
-    });
-
-    socket.on('ice_candidate', (data) => {
-        const targetSocket = Object.values(registeredUsers).find(u => u.name === data.targetName);
-        if (targetSocket) {
-            io.to(targetSocket.socketId).emit('ice_candidate', { candidate: data.candidate });
-        }
-    });
-
-    socket.on('end_call', (data) => {
-        const targetSocket = Object.values(registeredUsers).find(u => u.name === data.targetName);
-        if (targetSocket) {
-            io.to(targetSocket.socketId).emit('call_ended');
-        }
-    });
-
-    socket.on('disconnect', () => {
-        delete connectedSockets[socket.id];
-        console.log('Utilisateur déconnecté :', socket.id);
-    });
+const io = new Server(server, {
+    cors: {
+        origin: "*"
+    }
 });
 
-const PORT = process.env.PORT || 3000;
+/*
+=================================================
+BASE TEMPORAIRE EN MEMOIRE
+=================================================
+*/
+
+let users = [];
+let likes = [];
+let matches = [];
+
+/*
+=================================================
+INSCRIPTION
+=================================================
+*/
+
+app.post("/register", (req, res) => {
+
+    const {
+        name,
+        email,
+        password,
+        age,
+        city,
+        gender,
+        lookingFor,
+        bio
+    } = req.body;
+
+    const existingUser =
+        users.find(
+            u => u.email === email
+        );
+
+    if (existingUser) {
+
+        return res.status(400).json({
+            success: false,
+            message: "Email déjà utilisé"
+        });
+
+    }
+
+    const user = {
+
+        id: Date.now().toString(),
+
+        name,
+        email,
+        password,
+
+        age,
+        city,
+        gender,
+        lookingFor,
+        bio,
+
+        photo: "",
+
+        online: false
+
+    };
+
+    users.push(user);
+
+    res.json({
+        success: true,
+        message: "Compte créé"
+    });
+
+});
+
+/*
+=================================================
+CONNEXION
+=================================================
+*/
+
+app.post("/login", (req, res) => {
+
+    const {
+        email,
+        password
+    } = req.body;
+
+    const user =
+        users.find(
+            u =>
+                u.email === email &&
+                u.password === password
+        );
+
+    if (!user) {
+
+        return res.status(401).json({
+
+            success: false,
+
+            message:
+            "Email ou mot de passe incorrect"
+
+        });
+
+    }
+
+    res.json({
+
+        success: true,
+
+        user
+
+    });
+
+});
+
+/*
+=================================================
+PROFILS
+=================================================
+*/
+
+app.get("/users", (req, res) => {
+
+    res.json(users);
+
+});
+
+/*
+=================================================
+SOCKET.IO
+=================================================
+*/
+
+io.on("connection", socket => {
+
+    console.log("Utilisateur connecté");
+
+    socket.on(
+        "register_user",
+        data => {
+
+            const user =
+                users.find(
+                    u => u.name === data.name
+                );
+
+            if (user) {
+
+                user.socketId = socket.id;
+                user.online = true;
+
+            }
+
+            io.emit(
+                "update_users_list",
+                users
+            );
+
+        }
+    );
+
+    /*
+    =============================================
+    LIKE
+    =============================================
+    */
+
+    socket.on(
+        "send_like",
+        data => {
+
+            likes.push({
+
+                sender:
+                data.senderName,
+
+                receiver:
+                data.targetName
+
+            });
+
+            const targetUser =
+                users.find(
+                    u =>
+                    u.name ===
+                    data.targetName
+                );
+
+            if (
+                targetUser &&
+                targetUser.socketId
+            ) {
+
+                io.to(
+                    targetUser.socketId
+                ).emit(
+
+                    "receive_like_notification",
+
+                    {
+                        senderName:
+                        data.senderName
+                    }
+
+                );
+
+            }
+
+            const reverseLike =
+                likes.find(
+
+                    l =>
+
+                    l.sender ===
+                    data.targetName &&
+
+                    l.receiver ===
+                    data.senderName
+
+                );
+
+            if (reverseLike) {
+
+                matches.push({
+
+                    users: [
+
+                        data.senderName,
+
+                        data.targetName
+
+                    ]
+
+                });
+
+                const senderUser =
+                    users.find(
+                        u =>
+                        u.name ===
+                        data.senderName
+                    );
+
+                if (
+                    senderUser &&
+                    senderUser.socketId
+                ) {
+
+                    io.to(
+                        senderUser.socketId
+                    ).emit(
+
+                        "match_success",
+
+                        {
+                            targetName:
+                            data.targetName
+                        }
+
+                    );
+
+                }
+
+                if (
+                    targetUser &&
+                    targetUser.socketId
+                ) {
+
+                    io.to(
+                        targetUser.socketId
+                    ).emit(
+
+                        "match_success",
+
+                        {
+                            targetName:
+                            data.senderName
+                        }
+
+                    );
+
+                }
+
+            }
+
+        }
+
+    );
+
+    /*
+    =============================================
+    MESSAGE
+    =============================================
+    */
+
+    socket.on(
+        "send_message",
+        data => {
+
+            const match =
+                matches.find(
+
+                    m =>
+
+                    m.users.includes(
+                        data.author
+                    )
+
+                    &&
+
+                    m.users.includes(
+                        data.targetName
+                    )
+
+                );
+
+            if (!match) {
+
+                socket.emit(
+
+                    "error_message",
+
+                    {
+                        message:
+                        "Vous devez obtenir un Match avant de discuter."
+                    }
+
+                );
+
+                return;
+
+            }
+
+            const receiver =
+                users.find(
+
+                    u =>
+                    u.name ===
+                    data.targetName
+
+                );
+
+            if (
+                receiver &&
+                receiver.socketId
+            ) {
+
+                io.to(
+                    receiver.socketId
+                ).emit(
+
+                    "receive_message",
+
+                    data
+
+                );
+
+                io.to(
+                    receiver.socketId
+                ).emit(
+
+                    "message_notification",
+
+                    {
+                        senderName:
+                        data.author
+                    }
+
+                );
+
+            }
+
+            socket.emit(
+                "receive_message",
+                data
+            );
+
+        }
+    );
+
+    /*
+    =============================================
+    DECONNEXION
+    =============================================
+    */
+
+    socket.on(
+        "disconnect",
+        () => {
+
+            users.forEach(
+                user => {
+
+                    if (
+                        user.socketId ===
+                        socket.id
+                    ) {
+
+                        user.online = false;
+
+                    }
+
+                }
+            );
+
+            io.emit(
+                "update_users_list",
+                users
+            );
+
+        }
+    );
+
+});
+
+/*
+=================================================
+DEMARRAGE
+=================================================
+*/
+
+const PORT =
+process.env.PORT || 3000;
+
 server.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT}`);
+
+    console.log(
+        `Serveur démarré : http://localhost:${PORT}`
+    );
+
 });
