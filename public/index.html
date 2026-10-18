@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🌹 Amour & Cie</title>
+<script src="/socket.io/socket.io.js"></script>
 
 <style>
-
 *{
     margin:0;
     padding:0;
@@ -19,30 +19,32 @@ body{
     display:flex;
     align-items:center;
     justify-content:center;
-    background:linear-gradient(
-        135deg,
-        #ff4458,
-        #ff6b81,
-        #ff8e53
-    );
+    background:linear-gradient(135deg, #ff4458, #ff6b81, #ff8e53);
 }
 
 .container{
     width:100%;
     max-width:420px;
-    padding:20px;
+    height:740px;
+    padding:10px;
+    display:flex;
 }
 
 .card{
     background:white;
     border-radius:25px;
-    padding:30px;
+    padding:20px;
     box-shadow:0 20px 40px rgba(0,0,0,.15);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
 }
 
 .logo{
     text-align:center;
-    margin-bottom:20px;
+    margin-bottom:15px;
 }
 
 .logo h1{
@@ -52,12 +54,12 @@ body{
 .tabs{
     display:flex;
     gap:10px;
-    margin-bottom:20px;
+    margin-bottom:15px;
 }
 
 .tabs button{
     flex:1;
-    padding:12px;
+    padding:10px;
     border:none;
     border-radius:12px;
     font-weight:bold;
@@ -76,12 +78,15 @@ body{
 .form{
     display:flex;
     flex-direction:column;
-    gap:10px;
+    gap:8px;
+    overflow-y: auto;
+    flex: 1;
+    padding-bottom: 10px;
 }
 
 input,select,textarea{
     width:100%;
-    padding:12px;
+    padding:10px;
     border:1px solid #ddd;
     border-radius:10px;
 }
@@ -94,7 +99,7 @@ textarea{
     background:#ff4458;
     color:white;
     border:none;
-    padding:14px;
+    padding:12px;
     border-radius:30px;
     font-size:16px;
     cursor:pointer;
@@ -105,321 +110,376 @@ textarea{
 }
 
 .hidden{
-    display:none;
+    display:none !important;
 }
 
 #status{
-    margin-top:15px;
+    margin-top:10px;
     text-align:center;
     color:green;
+    font-size: 13px;
 }
 
 .photo-preview{
-    width:100px;
-    height:100px;
+    width:80px;
+    height:80px;
     border-radius:50%;
     background:#eee;
     margin:auto;
     background-size:cover;
     background-position:center;
+    border: 3px solid #ff4458;
 }
 
+/* Vues additionnelles swipe/chat/profil */
+.view-panel { display: none; flex-direction: column; flex: 1; overflow-y: auto; }
+.view-panel.active { display: flex; }
+
+.swipe-card {
+    flex: 1; background: #fff; border-radius: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    border: 1px solid #f0f0f0; display: flex; flex-direction: column; overflow: hidden; position: relative;
+}
+.photo-container {
+    flex: 1; background-size: cover; background-position: center; position: relative;
+    display: flex; align-items: flex-end; padding: 15px; min-height: 240px;
+}
+.photo-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%);
+}
+.profile-info { position: relative; z-index: 2; color: white; }
+.profile-name { font-size: 20px; font-weight: 800; }
+.profile-details { padding: 10px; background: white; }
+.profile-bio { font-size: 12px; color: #666; line-height: 1.3; }
+
+.swipe-actions { display: flex; justify-content: space-around; padding: 10px 0; }
+.action-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: none;
+    display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.btn-pass { background: #fff; color: #e74c3c; border: 1px solid #fee; }
+.btn-like { background: #2ecc71; color: #fff; }
+
+.chat-box {
+    flex: 1; border: 1px solid #eee; border-radius: 12px; padding: 10px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; margin-bottom: 8px;
+}
+.msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.3; }
+.msg.me { align-self: flex-end; background: #ff4458; color: white; border-bottom-right-radius: 2px; }
+.msg.other { align-self: flex-start; background: #e5e5ea; color: #000; border-bottom-left-radius: 2px; }
+.msg-author { font-size: 10px; opacity: 0.8; margin-bottom: 2px; font-weight: bold; }
+
+.bottom-nav { display: flex; background: #fff; border-top: 1px solid #eee; padding: 8px 0; margin-top: 10px; }
+.nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; font-size: 11px; color: #888; cursor: pointer; gap: 3px;
+}
+.nav-item.active { color: #ff4458; font-weight: bold; }
+.nav-icon { font-size: 16px; }
 </style>
 </head>
 <body>
 
 <div class="container">
-
 <div class="card">
 
-<div class="logo">
-<h1>🌹 Amour & Cie</h1>
-<p>Trouvez votre moitié</p>
-</div>
+    <div class="logo">
+        <h1>🌹 Amour & Cie</h1>
+        <p>Trouvez votre moitié</p>
+    </div>
 
-<div class="tabs">
+    <!-- CONTENEUR PRINCIPAL D'AUTHENTIFICATION -->
+    <div id="authContainer" class="view-panel active">
+        <div class="tabs">
+            <button id="btnLoginTab" class="active" onclick="showLogin()">Connexion</button>
+            <button id="btnRegisterTab" class="inactive" onclick="showRegister()">Inscription</button>
+        </div>
 
-<button id="btnLogin"
-class="active"
-onclick="showLogin()">
-Connexion
-</button>
+        <!-- CONNEXION -->
+        <div id="loginView" class="form">
+            <input type="email" id="loginEmail" placeholder="Adresse email">
+            <input type="password" id="loginPassword" placeholder="Mot de passe">
+            <button class="submit" onclick="login()">Se connecter</button>
+        </div>
 
-<button id="btnRegister"
-class="inactive"
-onclick="showRegister()">
-Inscription
-</button>
+        <!-- INSCRIPTION -->
+        <div id="registerView" class="form hidden">
+            <div class="photo-preview" id="preview"></div>
+            <input type="file" accept="image/*" onchange="previewPhoto(event)">
+            <input type="text" id="name" placeholder="Prénom">
+            <input type="email" id="email" placeholder="Adresse email">
+            <input type="password" id="password" placeholder="Mot de passe">
+            <input type="password" id="confirmPassword" placeholder="Confirmation mot de passe">
+            <input type="number" id="age" placeholder="Âge">
+            <input type="text" id="city" placeholder="Ville">
+            <select id="gender">
+                <option value="homme">👨 Homme</option>
+                <option value="femme">👩 Femme</option>
+            </select>
+            <select id="lookingFor">
+                <option value="femme">👩 Recherche femme</option>
+                <option value="homme">👨 Recherche homme</option>
+            </select>
+            <textarea id="bio" rows="2" placeholder="Votre description"></textarea>
+            <button class="submit" onclick="register()">Créer mon compte</button>
+        </div>
+    </div>
 
-</div>
+    <!-- VUE SWIPE -->
+    <div id="view-swipe" class="view-panel">
+        <div class="swipe-card" id="card-container">
+            <div id="card-photo" class="photo-container" style="background-image: url('');">
+                <div class="photo-overlay"></div>
+                <div class="profile-info">
+                    <div class="profile-name"><span id="card-name">Recherche...</span>, <span id="card-age">--</span> ans</div>
+                    <div style="font-size: 12px; opacity: 0.9;">📍 <span id="card-city">--</span></div>
+                </div>
+            </div>
+            <div class="profile-details">
+                <div class="profile-bio" id="card-bio">En attente d'autres célibataires...</div>
+            </div>
+        </div>
+        <div class="swipe-actions">
+            <button type="button" class="action-btn btn-pass" onclick="swiperProfil(false)">❌</button>
+            <button type="button" class="action-btn btn-like" onclick="swiperProfil(true)">❤️</button>
+        </div>
+    </div>
 
-<!-- CONNEXION -->
+    <!-- VUE CHAT -->
+    <div id="view-chat" class="view-panel">
+        <h3 style="font-size: 15px; margin-bottom: 8px;">Discussion (Match requis)</h3>
+        <div class="chat-box" id="chat-messages">
+            <div class="msg other">
+                <div class="msg-author">Système</div>
+                Discutez avec vos matchs ici !
+            </div>
+        </div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="msg-input" placeholder="Votre message..." onkeypress="handleKeyPress(event)">
+            <button type="button" class="submit" style="padding: 10px 15px; border-radius: 10px;" onclick="sendMessage()">Envoyer</button>
+        </div>
+    </div>
 
-<div id="loginView">
+    <!-- VUE PROFIL (Votre photo, nom, prénom, etc.) -->
+    <div id="view-profile" class="view-panel" style="align-items: center; text-align: center; justify-content: center;">
+        <div class="photo-preview" id="profile-photo-view" style="width: 100px; height: 100px; margin-bottom: 15px;"></div>
+        <h2 id="profile-name-view" style="color: #ff4458; margin-bottom: 5px;"></h2>
+        <p id="profile-details-view" style="color: #666; font-size: 14px; margin-bottom: 5px;"></p>
+        <p id="profile-city-view" style="color: #888; font-size: 13px; margin-bottom: 10px;"></p>
+        <p id="profile-bio-view" style="color: #444; font-size: 13px; font-style: italic; margin-bottom: 20px;"></p>
+        <button class="submit" style="background: #d9534f; width: auto; padding: 10px 20px;" onclick="deconnecter()">Se déconnecter</button>
+    </div>
 
-<div class="form">
+    <div id="status"></div>
 
-<input
-type="email"
-id="loginEmail"
-placeholder="Adresse email">
-
-<input
-type="password"
-id="loginPassword"
-placeholder="Mot de passe">
-
-<button
-class="submit"
-onclick="login()">
-Se connecter
-</button>
-
-</div>
-
-</div>
-
-<!-- INSCRIPTION -->
-
-<div id="registerView" class="hidden">
-
-<div class="form">
-
-<div
-class="photo-preview"
-id="preview">
-</div>
-
-<input
-type="file"
-accept="image/*"
-onchange="previewPhoto(event)">
-
-<input
-type="text"
-id="name"
-placeholder="Prénom">
-
-<input
-type="email"
-id="email"
-placeholder="Adresse email">
-
-<input
-type="password"
-id="password"
-placeholder="Mot de passe">
-
-<input
-type="password"
-id="confirmPassword"
-placeholder="Confirmation mot de passe">
-
-<input
-type="number"
-id="age"
-placeholder="Âge">
-
-<input
-type="text"
-id="city"
-placeholder="Ville">
-
-<select id="gender">
-<option value="homme">👨 Homme</option>
-<option value="femme">👩 Femme</option>
-</select>
-
-<select id="lookingFor">
-<option value="femme">👩 Recherche femme</option>
-<option value="homme">👨 Recherche homme</option>
-</select>
-
-<textarea
-id="bio"
-rows="3"
-placeholder="Votre description">
-</textarea>
-
-<button
-class="submit"
-onclick="register()">
-Créer mon compte
-</button>
+    <!-- NAVBAR DU BAS -->
+    <div class="bottom-nav" id="bottom-nav" style="display: none;">
+        <div class="nav-item active" id="nav-swipe" onclick="switchTab('swipe', this)"><div class="nav-icon">🔥</div><span>Découvrir</span></div>
+        <div class="nav-item" id="nav-chat" onclick="switchTab('chat', this)"><div class="nav-icon">💬</div><span>Messages</span></div>
+        <div class="nav-item" id="nav-profile" onclick="switchTab('profile', this)"><div class="nav-icon">👤</div><span>Profil</span></div>
+    </div>
 
 </div>
-
-</div>
-
-<div id="status"></div>
-
-</div>
-
 </div>
 
 <script>
+const socket = io();
+let currentUser = "";
+let userPhotoBase64 = "";
+let allUsers = [];
+let currentProfileIndex = 0;
 
 function showLogin(){
-
-document.getElementById("loginView")
-.classList.remove("hidden");
-
-document.getElementById("registerView")
-.classList.add("hidden");
-
-btnLogin.className="active";
-btnRegister.className="inactive";
-
+    document.getElementById("loginView").classList.remove("hidden");
+    document.getElementById("registerView").classList.add("hidden");
+    document.getElementById("btnLoginTab").className = "active";
+    document.getElementById("btnRegisterTab").className = "inactive";
 }
 
 function showRegister(){
-
-document.getElementById("registerView")
-.classList.remove("hidden");
-
-document.getElementById("loginView")
-.classList.add("hidden");
-
-btnRegister.className="active";
-btnLogin.className="inactive";
-
+    document.getElementById("registerView").classList.remove("hidden");
+    document.getElementById("loginView").classList.add("hidden");
+    document.getElementById("btnRegisterTab").className = "active";
+    document.getElementById("btnLoginTab").className = "inactive";
 }
 
 function previewPhoto(event){
-
-const file =
-event.target.files[0];
-
-if(!file) return;
-
-const reader =
-new FileReader();
-
-reader.onload=function(e){
-
-document.getElementById("preview")
-.style.backgroundImage=
-`url('${e.target.result}')`;
-
-}
-
-reader.readAsDataURL(file);
-
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+        userPhotoBase64 = e.target.result;
+        document.getElementById("preview").style.backgroundImage = `url('${userPhotoBase64}')`;
+    }
+    reader.readAsDataURL(file);
 }
 
 async function register(){
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const confirm = document.getElementById("confirmPassword").value;
+    const age = document.getElementById("age").value;
+    const city = document.getElementById("city").value;
+    const gender = document.getElementById("gender").value;
+    const lookingFor = document.getElementById("lookingFor").value;
+    const bio = document.getElementById("bio").value;
 
-const password =
-document.getElementById("password").value;
+    if(password !== confirm){
+        alert("Les mots de passe ne correspondent pas.");
+        return;
+    }
 
-const confirm =
-document.getElementById("confirmPassword").value;
+    currentUser = name;
 
-if(password !== confirm){
+    // Remplir la vue Profil avec les infos saisies
+    document.getElementById("profile-name-view").innerText = name;
+    document.getElementById("profile-details-view").innerText = `${age} ans • ${gender}`;
+    document.getElementById("profile-city-view").innerText = `📍 ${city}`;
+    document.getElementById("profile-bio-view").innerText = bio ? `"${bio}"` : "Aucune bio";
+    if(userPhotoBase64) {
+        document.getElementById("profile-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
+    }
 
-alert(
-"Les mots de passe ne correspondent pas."
-);
+    // Afficher l'application principale et la navbar
+    document.getElementById("authContainer").classList.remove("active");
+    document.getElementById("authContainer").style.display = "none";
+    document.getElementById("bottom-nav").style.display = "flex";
+    switchTab('swipe', document.getElementById('nav-swipe'));
 
-return;
-
-}
-
-const response =
-await fetch("/register",{
-
-method:"POST",
-
-headers:{
-"Content-Type":"application/json"
-},
-
-body:JSON.stringify({
-
-name:
-document.getElementById("name").value,
-
-email:
-document.getElementById("email").value,
-
-password:
-password,
-
-age:
-document.getElementById("age").value,
-
-city:
-document.getElementById("city").value,
-
-gender:
-document.getElementById("gender").value,
-
-lookingFor:
-document.getElementById("lookingFor").value,
-
-bio:
-document.getElementById("bio").value
-
-})
-
-});
-
-const data =
-await response.json();
-
-document.getElementById("status")
-.innerText =
-data.message ||
-"Compte créé";
-
+    socket.emit("register_user", { name, gender });
+    document.getElementById("status").innerText = "Compte créé avec succès !";
 }
 
 async function login(){
+    const email = document.getElementById("loginEmail").value.trim();
+    if(!email){
+        alert("Veuillez entrer votre email.");
+        return;
+    }
 
-const response =
-await fetch("/login",{
+    currentUser = email.split('@')[0];
 
-method:"POST",
+    // Remplir la vue Profil par défaut
+    document.getElementById("profile-name-view").innerText = currentUser;
+    document.getElementById("profile-details-view").innerText = "25 ans • homme";
+    document.getElementById("profile-city-view").innerText = "📍 Paris";
+    document.getElementById("profile-bio-view").innerText = "Connecté via email";
 
-headers:{
-"Content-Type":"application/json"
-},
+    document.getElementById("authContainer").classList.remove("active");
+    document.getElementById("authContainer").style.display = "none";
+    document.getElementById("bottom-nav").style.display = "flex";
+    switchTab('swipe', document.getElementById('nav-swipe'));
 
-body:JSON.stringify({
+    socket.emit("register_user", { name: currentUser, gender: 'homme' });
+}
 
-email:
-document.getElementById("loginEmail").value,
+function switchTab(tabName, element) {
+    document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach(n => n.navItem && n.classList.remove("active") || n.classList.remove("active"));
+    
+    if(tabName === 'swipe') {
+        document.getElementById("view-swipe").classList.add("active");
+    } else if(tabName === 'chat') {
+        document.getElementById("view-chat").classList.add("active");
+    } else if(tabName === 'profile') {
+        document.getElementById("view-profile").classList.add("active");
+    }
+    if (element) element.classList.add("active");
+}
 
-password:
-document.getElementById("loginPassword").value
+function deconnecter() {
+    currentUser = "";
+    document.getElementById("bottom-nav").style.display = "none";
+    document.getElementById("authContainer").style.display = "flex";
+    document.getElementById("authContainer").classList.add("active");
+    document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById("authContainer").classList.add("active");
+    showLogin();
+}
 
-})
-
+socket.on('update_users_list', (users) => {
+    allUsers = users.filter(u => u.name !== currentUser);
+    currentProfileIndex = 0;
+    afficherProfilCourant();
 });
 
-const data =
-await response.json();
+function afficherProfilCourant() {
+    const cardPhoto = document.getElementById("card-photo");
+    const cardName = document.getElementById("card-name");
+    const cardAge = document.getElementById("card-age");
+    const cardCity = document.getElementById("card-city");
+    const cardBio = document.getElementById("card-bio");
 
-if(data.success){
+    if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) {
+        cardName.innerText = "Plus de profils";
+        cardAge.innerText = "--";
+        cardCity.innerText = "Revenez plus tard";
+        cardBio.innerText = "Aucun autre utilisateur en ligne pour le moment.";
+        cardPhoto.style.backgroundImage = "none";
+        return;
+    }
 
-localStorage.setItem(
-"user",
-JSON.stringify(data)
-);
-
-alert("Connexion réussie !");
-
-}else{
-
-alert(
-data.message ||
-"Connexion impossible"
-);
-
+    const profile = allUsers[currentProfileIndex];
+    cardName.innerText = profile.name || "Inconnu";
+    cardAge.innerText = profile.age || "--";
+    cardCity.innerText = profile.city || "Paris";
+    cardBio.innerText = profile.bio || "Pas de description.";
+    if(profile.photo) {
+        cardPhoto.style.backgroundImage = `url('${profile.photo}')`;
+    }
 }
 
+function swiperProfil(isLike) {
+    if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) return;
+    const target = allUsers[currentProfileIndex];
+    if (isLike) {
+        socket.emit('send_like', { senderName: currentUser, targetName: target.name, isliked: true });
+    }
+    currentProfileIndex++;
+    afficherProfilCourant();
 }
 
+function sendMessage() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (text !== "" && allUsers.length > 0) {
+        const target = allUsers[0];
+        socket.emit('send_message', { 
+            author: currentUser, 
+            targetName: target.name, 
+            text: text, 
+            type: 'text' 
+        });
+        input.value = "";
+    }
+}
+
+function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+
+socket.on('receive_message', (data) => {
+    const chatBox = document.getElementById('chat-messages');
+    const isMe = data.author === currentUser;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg ${isMe ? 'me' : 'other'}`;
+    msgDiv.innerHTML = `<div class="msg-author">${data.author}</div>${data.text}`;
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+});
+
+socket.on('match_success', (data) => {
+    alert(`🎉 C'est un Match avec ${data.targetName} ! Vous pouvez discuter.`);
+    switchTab('chat', document.getElementById('nav-chat'));
+});
+
+socket.on('receive_like_notification', (data) => {
+    alert(`💖 ${data.senderName} vous a envoyé un Like !`);
+});
+
+socket.on('error_message', (data) => {
+    alert(data.message);
+});
 </script>
 
 </body>
