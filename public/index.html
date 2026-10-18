@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amour & Cie - Rencontres</title>
     <script src="/socket.io/socket.io.js"></script>
-    <!-- Google Identity Services SDK -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --primary: #c95d43;
@@ -63,10 +61,10 @@
             color: white; border: none; cursor: pointer; font-size: 12px; padding: 0 12px; border-radius: 10px;
         }
 
-        .photo-picker-box { display: flex; flex-direction: column; align-items: center; margin: 4px 0; }
+        .photo-picker-box { display: flex; flex-direction: column; align-items: center; margin: 8px 0; }
         .photo-preview {
-            width: 80px; height: 80px; border-radius: 50%; background-size: cover;
-            background-position: center; border: 3px solid var(--primary); margin-bottom: 4px; background-color: #eee;
+            width: 90px; height: 90px; border-radius: 50%; background-size: cover;
+            background-position: center; border: 3px solid var(--primary); margin-bottom: 6px; background-color: #eee;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
@@ -144,33 +142,41 @@
 
         <div class="view-content">
 
-            <!-- 1. VUE INSCRIPTION / CONNEXION -->
+            <!-- 1. VUE ACCUEIL (CONNEXION / INSCRIPTION) -->
             <div id="view-auth" class="view-panel active">
-                <h3 style="text-align: center; margin-bottom: 12px; color: var(--primary); font-size: 18px;">Bienvenue sur Amour & Cie 💖</h3>
+                <h3 style="text-align: center; margin-bottom: 15px; color: var(--primary); font-size: 18px;">Bienvenue sur Amour & Cie 💖</h3>
 
-                <!-- Boutons Onglets : Se connecter / S'inscrire -->
+                <!-- Onglets -->
                 <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
                     <button id="btn-tab-login" type="button" onclick="switchAuthMode('login')" style="padding: 8px 16px; font-weight: bold; background-color: var(--primary); color: white; border: none; border-radius: 20px; cursor: pointer;">Se connecter</button>
                     <button id="btn-tab-register" type="button" onclick="switchAuthMode('register')" style="padding: 8px 16px; background-color: #e0e0e0; color: #333; border: none; border-radius: 20px; cursor: pointer;">S'inscrire</button>
                 </div>
 
-                <!-- 1. Formulaire de Connexion (E-mail) -->
-                <form id="login-form" onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
-                    <input type="email" id="login-email" placeholder="Votre Adresse E-mail" required style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                <!-- Formulaire de Connexion E-mail -->
+                <form id="login-form" onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div class="form-group">
+                        <label>Adresse E-mail</label>
+                        <input type="email" id="login-email" placeholder="votre.email@exemple.com" required>
+                    </div>
                     <button type="submit" class="btn-main" style="padding: 10px;">Se connecter</button>
                 </form>
 
-                <!-- 2. Formulaire d'Inscription -->
-                <form id="register-form" onsubmit="handleRegister(event)" style="display: none; flex-direction: column; gap: 10px;">
+                <!-- Formulaire d'Inscription -->
+                <form id="register-form" onsubmit="handleRegister(event)" style="display: none; flex-direction: column; gap: 8px;">
                     <div class="photo-picker-box">
                         <div id="reg-photo-preview" class="photo-preview" style="background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80')"></div>
                         <input type="file" id="gallery-file" accept="image/*" style="display: none;" onchange="chargerPhotoGalerie(event)">
-                        <button type="button" class="btn-main btn-gps" onclick="document.getElementById('gallery-file').click()">Choisir une photo</button>
+                        <button type="button" class="btn-gps" onclick="document.getElementById('gallery-file').click()">Choisir une photo</button>
                     </div>
 
                     <div class="form-group">
                         <label>Prénom</label>
-                        <input type="text" id="reg-name" placeholder="Votre Prénom" required>
+                        <input type="text" id="reg-name" placeholder="Votre prénom" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Adresse E-mail</label>
+                        <input type="email" id="reg-email" placeholder="votre.email@exemple.com" required>
                     </div>
 
                     <div class="input-row">
@@ -206,22 +212,11 @@
 
                     <div class="form-group">
                         <label>Bio / Description</label>
-                        <textarea id="reg-bio" rows="2" placeholder="Écrivez quelques mots sur vous..."></textarea>
+                        <textarea id="reg-bio" rows="2" placeholder="Quelques mots sur vous..."></textarea>
                     </div>
 
-                    <button type="submit" class="btn-main" style="padding: 10px;">Créer mon compte</button>
+                    <button type="submit" class="btn-main" style="padding: 10px; margin-top: 5px;">Créer mon compte</button>
                 </form>
-
-                <!-- Option Connexion Google -->
-                <div style="text-align: center; font-size: 12px; color: #888; margin: 12px 0 6px 0;">OU</div>
-                <div style="display: flex; justify-content: center;">
-                    <div id="g_id_onload"
-                        data-client_id="612038682112-je9l72xvtcv49daic2pt2aik8t3p0g5c.apps.googleusercontent.com"
-                        data-callback="handleGoogleResponse"
-                        data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin" data-type="standard" data-size="large" data-text="signin_with" data-shape="rectangular"></div>
-                </div>
             </div>
 
             <!-- 2. VUE SWIPE -->
@@ -245,7 +240,7 @@
                 </div>
             </div>
 
-            <!-- 3. VUE MESSAGES & APPELS -->
+            <!-- 3. VUE CHAT -->
             <div id="view-chat" class="view-panel">
                 <div class="chat-header-actions">
                     <h3 style="font-size: 15px;">Discussion</h3>
@@ -269,25 +264,28 @@
                 </div>
             </div>
 
-            <!-- 4. VUE PROFIL & PREMIUM -->
+            <!-- 4. VUE PROFIL -->
             <div id="view-profile" class="view-panel">
-                <h3 style="margin-bottom: 8px; font-size: 15px;">Mon Compte</h3>
+                <h3 style="margin-bottom: 12px; font-size: 16px; text-align: center;">Mon Compte</h3>
                 <div class="photo-picker-box">
                     <div id="user-photo-view" class="photo-preview"></div>
-                    <b id="user-display-name"></b>
-                    <span id="user-city-view" style="font-size: 11px; color: #666;"></span>
+                    <h4 id="user-display-name" style="margin-top: 5px; font-size: 16px;"></h4>
+                    <p id="user-city-view" style="font-size: 12px; color: #666; margin-top: 2px;"></p>
+                    <p id="user-bio-view" style="font-size: 12px; color: #444; margin-top: 8px; text-align: center; font-style: italic;"></p>
                 </div>
-                <div id="premium-box" style="background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 10px; margin-top: 8px; text-align: center;">
+
+                <div id="premium-box" style="background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 10px; margin-top: 10px; text-align: center;">
                     <h4 style="color: #d35400; margin-bottom: 2px; font-size: 13px;">⭐ Abonnement Premium</h4>
                     <p style="font-size: 10px; color: #666; margin-bottom: 6px;">Nécessaire après vos 10 likes gratuits quotidiens.</p>
                     <button id="btn-acheter" class="btn-gold" style="padding: 7px; font-size: 12px;" onclick="window.location.href='https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000';">Activer l'abonnement (9,99€)</button>
                 </div>
-                <button type="button" class="btn-main" style="background: #d9534f; margin-top: 10px; padding: 9px;" onclick="deconnecter()">🚪 Se déconnecter</button>
+
+                <button type="button" class="btn-main" style="background: #d9534f; margin-top: 20px; padding: 10px;" onclick="deconnecter()">🚪 Se déconnecter</button>
             </div>
 
         </div>
 
-        <!-- MODALE APPEL AUDIO / VIDEO EN COURS -->
+        <!-- MODALE APPEL -->
         <div id="call-modal">
             <h3 id="call-status-text" style="margin-bottom: 10px;">Appel en cours...</h3>
             <div id="call-videos">
@@ -309,7 +307,10 @@
         const STRIPE_PREMIUM_LINK = "https://buy.stripe.com/3cIcN58ODfBS34m8TJ48000";
         const socket = io();
         let currentUser = "";
+        let userAge = "25";
+        let userCity = "Paris";
         let userGender = "homme";
+        let userBio = "";
         let userPhotoBase64 = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=500&q=80";
         let isUserPremium = false;
         let allUsers = [];
@@ -338,69 +339,62 @@
             }
         }
 
+        function miseAJourVueProfil() {
+            document.getElementById("user-display-name").innerText = `${currentUser}, ${userAge} ans (${userGender})`;
+            document.getElementById("user-city-view").innerText = `📍 ${userCity}`;
+            document.getElementById("user-bio-view").innerText = userBio ? `"${userBio}"` : "";
+            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
+        }
+
         function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById("login-email").value.trim();
-            if (!email) { alert("Veuillez entrer votre adresse e-mail."); return; }
+            if (!email) return;
+
             currentUser = email.split('@')[0];
+            userAge = "25";
+            userCity = "Paris";
             userGender = "homme";
-            
-            document.getElementById("user-display-name").innerText = `${currentUser} (${userGender})`;
-            document.getElementById("user-city-view").innerText = "Paris";
-            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
-            
+            userBio = "";
+
+            miseAJourVueProfil();
+
             document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name: currentUser, email: email, gender: userGender, photo: userPhotoBase64, isPremium: isUserPremium });
+            socket.emit('register_user', { name: currentUser, email: email, age: userAge, city: userCity, gender: userGender, photo: userPhotoBase64, isPremium: isUserPremium });
             switchTab("swipe", document.getElementById("nav-swipe"));
         }
 
         function handleRegister(e) {
             e.preventDefault();
             const name = document.getElementById("reg-name").value.trim();
+            const email = document.getElementById("reg-email").value.trim();
             const age = document.getElementById("reg-age").value.trim();
             const city = document.getElementById("reg-city").value.trim();
             const gender = document.getElementById("reg-gender").value;
             const lookingFor = document.getElementById("reg-looking").value;
             const bio = document.getElementById("reg-bio").value.trim();
 
-            if (!name) { alert("Veuillez inscrire votre prénom."); return; }
+            if (!name || !email) return;
 
             currentUser = name;
+            userAge = age || "25";
+            userCity = city || "Paris";
             userGender = gender;
-            document.getElementById("user-display-name").innerText = `${name}, ${age || '25'} ans (${gender})`;
-            document.getElementById("user-city-view").innerText = city || 'Paris';
-            document.getElementById("user-photo-view").style.backgroundImage = `url('${userPhotoBase64}')`;
+            userBio = bio;
+
+            miseAJourVueProfil();
 
             if (gender === 'femme') {
                 document.getElementById("premium-box").style.display = "none";
-                document.getElementById("badge-status").innerText = "Compte Gratuit (Illimité)";
+                document.getElementById("badge-status").innerText = "Gratuit";
             } else {
                 document.getElementById("premium-box").style.display = "block";
                 document.getElementById("badge-status").innerText = "Standard (10 likes/j)";
             }
 
             document.getElementById("bottom-nav").style.display = "flex";
-            socket.emit('register_user', { name, age, city, gender, lookingFor, bio, photo: userPhotoBase64, isPremium: isUserPremium });
+            socket.emit('register_user', { name, email, age: userAge, city: userCity, gender, lookingFor, bio, photo: userPhotoBase64, isPremium: isUserPremium });
             switchTab("swipe", document.getElementById("nav-swipe"));
-        }
-
-        function handleGoogleResponse(response) {
-            try {
-                const base64Url = response.credential.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-                const googleUser = JSON.parse(jsonPayload);
-
-                document.getElementById("reg-name").value = googleUser.given_name || googleUser.name;
-                if (googleUser.picture) {
-                    userPhotoBase64 = googleUser.picture;
-                    document.getElementById("reg-photo-preview").style.backgroundImage = `url('${userPhotoBase64}')`;
-                }
-                switchAuthMode('register');
-                alert(`Bienvenue ${googleUser.name} ! Complétez les dernières infos si besoin et validez.`);
-            } catch(e) {
-                console.error("Erreur connexion Google", e);
-            }
         }
 
         function chargerPhotoGalerie(event) {
@@ -426,18 +420,11 @@
                             const data = await res.json();
                             const city = data.address.city || data.address.town || data.address.village || "Ma ville";
                             document.getElementById("reg-city").value = city;
-                            alert(`📍 Ville détectée : ${city}`);
                         } catch(e) {
                             document.getElementById("reg-city").value = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-                            alert("📍 Position GPS récupérée !");
                         }
-                    },
-                    (error) => {
-                        alert("Impossible de récupérer la position GPS. Vérifiez les autorisations de votre navigateur.");
                     }
                 );
-            } else {
-                alert("La géolocalisation n'est pas prise en charge.");
             }
         }
 
@@ -458,7 +445,7 @@
         });
 
         socket.on('receive_like_notification', (data) => {
-            alert(`💖 ${data.senderName} vous a envoyé un Like ! Likés-le en retour pour débloquer le chat.`);
+            alert(`💖 ${data.senderName} vous a envoyé un Like ! Likez-le en retour pour débloquer le chat.`);
         });
 
         socket.on('error_message', (data) => {
@@ -489,221 +476,3 @@
         }
 
         function deconnecter() {
-            currentUser = "";
-            document.getElementById("bottom-nav").style.display = "none";
-            switchTab("auth", document.getElementById("nav-swipe"));
-        }
-
-        function afficherProfilCourant() {
-            const cardPhoto = document.getElementById("card-photo");
-            const cardName = document.getElementById("card-name");
-            const cardAge = document.getElementById("card-age");
-            const cardCity = document.getElementById("card-city");
-            const cardBio = document.getElementById("card-bio");
-
-            if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) {
-                cardName.innerText = "Plus de profils";
-                cardAge.innerText = "--";
-                cardCity.innerText = "Revenez plus tard";
-                cardBio.innerText = "Connectez un 2ème appareil pour créer un autre profil à liker !";
-                cardPhoto.style.backgroundImage = "none";
-                return;
-            }
-
-            const profile = allUsers[currentProfileIndex];
-            cardName.innerText = profile.name || "Inconnu";
-            cardAge.innerText = profile.age || "--";
-            cardCity.innerText = profile.city || "Paris";
-            cardBio.innerText = profile.bio || "Pas de description.";
-            cardPhoto.style.backgroundImage = `url('${profile.photo}')`;
-        }
-
-        function swiperProfil(isLike) {
-            if (isLike) {
-                if (!window.dailyLikesCount) window.dailyLikesCount = 0;
-                if (userGender === 'homme' && window.dailyLikesCount >= 10 && !isUserPremium) {
-                    window.location.href = STRIPE_PREMIUM_LINK;
-                    return;
-                }
-                window.dailyLikesCount++;
-            }
-
-            if (!allUsers || allUsers.length === 0 || currentProfileIndex >= allUsers.length) return;
-
-            const target = allUsers[currentProfileIndex];
-            if (isLike) {
-                socket.emit('send_like', { senderName: currentUser, targetName: target.name, isliked: true });
-            }
-            currentProfileIndex++;
-            afficherProfilCourant();
-        }
-
-        function acheterPremium() {
-            isUserPremium = true;
-            const badge = document.getElementById("badge-status");
-            if (badge) {
-                badge.innerText = "⭐ Premium Illimité";
-                badge.style.color = "#f39c12";
-            }
-            const btnActiver = document.getElementById("btn-acheter");
-            if (btnActiver) {
-                btnActiver.style.display = "none";
-            }
-            alert("Félicitations ! Votre abonnement Premium est activé.");
-            socket.emit('register_user', { name: currentUser, gender: userGender, isPremium: true });
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (text !== "" && allUsers.length > 0) {
-                const target = allUsers[0];
-                socket.emit('send_message', { 
-                    author: currentUser, 
-                    targetName: target.name, 
-                    text: text, 
-                    type: 'text' 
-                });
-                input.value = "";
-            }
-        }
-
-        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
-
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-
-        async function toggleRecordVoice() {
-            const btn = document.getElementById('btn-record');
-            if (!isRecording) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const reader = new FileReader();
-                        reader.readAsDataURL(audioBlob);
-                        reader.onloadend = () => {
-                            socket.emit('send_message', { author: currentUser, audioUrl: reader.result, type: 'voice' });
-                        };
-                    };
-                    mediaRecorder.start();
-                    isRecording = true;
-                    btn.style.background = '#e74c3c';
-                    btn.innerText = "⏹️";
-                } catch(e) {
-                    alert("Impossible d'accéder au micro.");
-                }
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
-                btn.style.background = 'var(--green-btn)';
-                btn.innerText = "🎤";
-            }
-        }
-
-        let peerConnection;
-        let localStream;
-        const servers = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-            ]
-        };
-
-        async function startCall(type) {
-            if (!allUsers || allUsers.length === 0) {
-                alert("Aucun correspondant disponible pour l'appel.");
-                return;
-            }
-            const target = allUsers[0];
-            document.getElementById('call-modal').style.display = 'flex';
-            document.getElementById('call-status-text').innerText = `Appel de ${target.name}...`;
-
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
-                document.getElementById('localVideo').srcObject = localStream;
-
-                peerConnection = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                peerConnection.ontrack = event => {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        socket.emit('ice_candidate', { targetName: target.name, candidate: event.candidate });
-                    }
-                };
-
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-
-                socket.emit('start_call', { callerName: currentUser, targetName: target.name, offer: offer, callType: type });
-            } catch(e) {
-                console.error("Erreur d'appel", e);
-                endCall();
-            }
-        }
-
-        socket.on('incoming_call', async (data) => {
-            document.getElementById('call-modal').style.display = 'flex';
-            document.getElementById('call-status-text').innerText = `Appel entrant de ${data.callerName}...`;
-
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: data.callType === 'video', audio: true });
-                document.getElementById('localVideo').srcObject = localStream;
-
-                peerConnection = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                peerConnection.ontrack = event => {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        socket.emit('ice_candidate', { targetName: data.callerName, candidate: event.candidate });
-                    }
-                };
-
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-
-                socket.emit('make_answer', { targetName: data.callerName, answer: answer });
-            } catch(e) {
-                console.error("Erreur réception appel", e);
-                endCall();
-            }
-        });
-
-        socket.on('call_answered', async (data) => {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        });
-
-        socket.on('ice_candidate', async (data) => {
-            if (peerConnection) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
-        });
-
-        socket.on('call_ended', () => {
-            endCall(false);
-        });
-
-        function endCall(notify = true) {
-            if (notify && allUsers.length > 0) {
-                socket.emit('end_call', { targetName: allUsers[0].name });
-            }
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            if (peerConnection) peerConnection.close();
-            document.getElementById('call-modal').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
