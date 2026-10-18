@@ -378,6 +378,15 @@
         });
 
         socket.on('receive_message', (data) => {
+          // Notification instantanée quand on reçoit un Like
+socket.on('receive_like_notification', (data) => {
+    alert(`💖 ${data.senderName} vous a envoyé un Like ! Likés-le en retour pour débloquer le chat.`);
+});
+
+// Alerte si on essaie d'envoyer un message sans Match mutuel
+socket.on('error_message', (data) => {
+    alert(data.message);
+});
             const chatBox = document.getElementById('chat-messages');
             const isMe = data.author === currentUser;
             const msgDiv = document.createElement('div');
@@ -501,8 +510,14 @@ function acheterPremium() {
 function sendMessage() {
     const input = document.getElementById('msg-input');
     const text = input.value.trim();
-    if (text !== "") {
-        socket.emit('send_message', { author: currentUser, text: text, type: 'text' });
+    if (text !== "" && allUsers.length > 0) {
+        const target = allUsers[0]; // Destinataire sélectionné
+        socket.emit('send_message', { 
+            author: currentUser, 
+            targetName: target.name, 
+            text: text, 
+            type: 'text' 
+        });
         input.value = "";
     }
 }
