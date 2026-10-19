@@ -43,7 +43,8 @@ app.post('/register', async (req, res) => {
     return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
   }
 
- const defaultPhoto = '';
+  // Pas de photo d'image de banque automatique
+  const defaultPhoto = '';
 
   const { data, error } = await supabase
     .from('profiles')
@@ -83,7 +84,7 @@ app.post('/login', async (req, res) => {
   res.json({ success: true, token: user.id, user: user });
 });
 
-// Vérification session
+// Vérification session /me
 app.get('/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ success: false, message: 'Non autorisé.' });
@@ -122,7 +123,6 @@ app.get('/matches', async (req, res) => {
   if (!authHeader) return res.status(401).json([]);
   const userId = authHeader.split(' ')[1];
 
-  // Récupérer les likes mutuels
   const { data: myLikes } = await supabase.from('likes').select('to_id').eq('from_id', userId);
   if (!myLikes || !myLikes.length) return res.json([]);
 
@@ -166,7 +166,35 @@ app.get('/messages/:matchId', async (req, res) => {
   res.json(formatted);
 });
 
-// Gestion Socket.io en temps réel
+// Stripe Checkout
+app.post('/api/create-checkout', async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: { name: 'Amour & Cie - Abonnement Privilège' },
+          unit_amount: 1990,
+          recurring: { interval: 'month' }
+        },
+        quantity: 1
+      }],
+      success_url: 'http://localhost:3000/?paiement=succes&user=' + userId,
+      cancel_url: 'http://localhost:3000/?paiement=annule',
+      client_reference_id: String(userId)
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Socket.io pour la messagerie et notifications en temps réel
 io.on('connection', (socket) => {
   const token = socket.handshake.auth.token;
   if (token) {
@@ -177,14 +205,18 @@ io.on('connection', (socket) => {
     if (!token || !data.targetId) return;
     await supabase.from('likes').upsert([{ from_id: token, to_id: data.targetId }]);
 
+    // Récupérer le nom de l'expéditeur
+    const { data: senderUser } = await supabase.from('profiles').select('name').eq('id', token).single();
+    const senderName = senderUser ? senderUser.name : 'Quelqu\'un';
+
     // Vérifier s'il y a match réciproque
     const { data: check } = await supabase.from('likes').select('id').eq('from_id', data.targetId).eq('to_id', token).limit(1);
     if (check && check.length > 0) {
       const { data: targetUser } = await supabase.from('profiles').select('*').eq('id', data.targetId).single();
       socket.emit('match_success', { matchId: data.targetId, user: targetUser });
-      io.to(data.targetId).emit('match_success', { matchId: token, user: { id: token } });
+      io.to(data.targetId).emit('match_success', { matchId: token, user: { id: token, name: senderName } });
     } else {
-      io.to(data.targetId).emit('receive_like_notification', { senderId: token, senderName: 'Quelqu un' });
+      io.to(data.targetId).emit('receive_like_notification', { senderId: token, senderName: senderName });
     }
   });
 
@@ -197,9 +229,14 @@ io.on('connection', (socket) => {
       content: data.text
     }]);
 
+    // Récupérer le nom de l'expéditeur pour la notification
+    const { data: senderUser } = await supabase.from('profiles').select('name').eq('id', token).single();
+    const senderName = senderUser ? senderUser.name : 'Quelqu\'un';
+
     const msgObj = {
       matchId: data.matchId,
       author: token,
+      authorName: senderName,
       text: data.text
     };
 
@@ -210,5 +247,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('Serveur opérationnel sur le port ' + PORT);
+  console.log('Serveur Amour & Cie opérationnel sur le port ' + PORT);
 });
