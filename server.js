@@ -1,16 +1,20 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const Stripe = require('stripe');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 const stripe = Stripe(process.env.STRIPE_KEY);
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -27,43 +31,16 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
-// Récupérer les profils avec filtre de distance
-app.get('/api/users', async (req, res) => {
-  const { userLat, userLon, maxKm } = req.query;
-  const { data, error } = await supabase.from('profiles').select('*').order('id', { ascending: false });
-  if (error) return res.status(500).json({ success: false, message: error.message });
-
-  let results = data;
-  if (userLat && userLon) {
-    const uLat = parseFloat(userLat);
-    const uLon = parseFloat(userLon);
-    const limitKm = maxKm ? parseFloat(maxKm) : null;
-
-    results = results.map(function (u) {
-      const distance = getDistanceKm(uLat, uLon, u.lat, u.lon);
-      return Object.assign({}, u, { distance: distance });
-    });
-
-    if (limitKm) {
-      results = results.filter(function (u) { return u.distance === null || u.distance <= limitKm; });
-    }
-    results.sort(function (a, b) { return (a.distance || 9999) - (b.distance || 9999); });
-  }
-
-  res.json(results);
-});
-
-// Route d'inscription corrigée pour correspondre au front
+// Inscription
 app.post('/register', async (req, res) => {
   const { name, email, password, age, city, gender, lookingFor, bio, photo, lat, lon } = req.body;
-  
   if (!name || !email || !password || !age || !gender || !city) {
-    return res.status(400).json({ success: false, message: 'Tous les champs obligatoires ne sont pas remplis.' });
+    return res.status(400).json({ success: false, message: 'Tous les champs obligatoires sont requis.' });
   }
 
   const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).limit(1);
   if (existing && existing.length > 0) {
-    return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé. Choisissez-en un autre.' });
+    return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
   }
 
   const defaultPhoto = gender === 'femme'
@@ -73,13 +50,11 @@ app.post('/register', async (req, res) => {
   const { data, error } = await supabase
     .from('profiles')
     .insert([{
-      name: name,
-      email: email,
-      password: password,
+      name, email, password,
       age: parseInt(age),
-      gender: gender,
+      gender,
       looking_for: lookingFor,
-      city: city,
+      city,
       bio: bio || '',
       lat: lat ? parseFloat(lat) : 48.8566,
       lon: lon ? parseFloat(lon) : 2.3522,
@@ -92,21 +67,15 @@ app.post('/register', async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ success: false, message: error.message });
-  
-  // Renvoyer un token factice ou l'ID utilisateur pour le localStorage
   res.json({ success: true, token: data.id, user: data });
 });
 
-// Route de connexion corrigée
+// Connexion
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'Email et mot de passe requis.' });
-  }
-
   const { data, error } = await supabase.from('profiles').select('*').eq('email', email).limit(1);
   if (error) return res.status(500).json({ success: false, message: error.message });
-  if (!data || data.length === 0) return res.status(404).json({ success: false, message: 'Aucun compte associé à cet email.' });
+  if (!data || data.length === 0) return res.status(404).json({ success: false, message: 'Compte introuvable.' });
 
   const user = data[0];
   if (user.password && user.password !== password) {
@@ -116,78 +85,132 @@ app.post('/login', async (req, res) => {
   res.json({ success: true, token: user.id, user: user });
 });
 
-// Route de vérification de session /me
-app.get('/api/me', async (req, res) => {
+// Vérification session
+app.get('/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ success: false, message: 'Non autorisé.' });
   const token = authHeader.split(' ')[1];
 
   const { data, error } = await supabase.from('profiles').select('*').eq('id', token).single();
   if (error || !data) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
-  
   res.json({ success: true, user: data });
 });
 
-app.post('/api/like', async (req, res) => {
-  const { fromId, toId } = req.body;
+// Découvrir les profils
+app.get('/discover', async (req, res) => {
+  const { radius } = req.query;
+  const { data, error } = await supabase.from('profiles').select('*').order('id', { ascending: false });
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
+});
 
-  const { data: user } = await supabase.from('profiles').select('*').eq('id', fromId).single();
-  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+// Likes reçus
+app.get('/likes', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json([]);
+  const userId = authHeader.split(' ')[1];
 
-  const today = new Date().toISOString().split('T')[0];
-  let currentLikes = user.likes_count || 0;
-  if (user.last_like_date !== today) currentLikes = 0;
+  const { data: likes } = await supabase.from('likes').select('from_id').eq('to_id', userId);
+  if (!likes || !likes.length) return res.json([]);
 
-  if (user.gender === 'homme' && !user.is_subscribed && currentLikes >= 10) {
-    return res.status(403).json({
-      error: 'QUOTA_LIKES_ATTEINT',
-      message: 'Limite de 10 likes atteinte pour aujourd hui ! Passez VIP pour liker sans limite.'
-    });
+  const fromIds = likes.map(l => l.from_id);
+  const { data: profiles } = await supabase.from('profiles').select('*').in('id', fromIds);
+  res.json(profiles || []);
+});
+
+// Matchs
+app.get('/matches', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json([]);
+  const userId = authHeader.split(' ')[1];
+
+  // Récupérer les likes mutuels
+  const { data: myLikes } = await supabase.from('likes').select('to_id').eq('from_id', userId);
+  if (!myLikes || !myLikes.length) return res.json([]);
+
+  const targetIds = myLikes.map(l => l.to_id);
+  const { data: mutualLikes } = await supabase.from('likes').select('from_id').eq('to_id', userId).in('from_id', targetIds);
+  if (!mutualLikes || !mutualLikes.length) return res.json([]);
+
+  const matchIds = mutualLikes.map(l => l.from_id);
+  const { data: matchedProfiles } = await supabase.from('profiles').select('*').in('id', matchIds);
+
+  const formattedMatches = (matchedProfiles || []).map(p => ({
+    matchId: p.id,
+    user: p
+  }));
+
+  res.json(formattedMatches);
+});
+
+// Messages d'un match
+app.get('/messages/:matchId', async (req, res) => {
+  const { matchId } = req.params;
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json([]);
+  const userId = authHeader.split(' ')[1];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .or(`and(sender_id.eq.${userId},receiver_id.eq.${matchId}),and(sender_id.eq.${matchId},receiver_id.eq.${userId})`)
+    .order('created_at', { ascending: true });
+
+  if (error) return res.status(500).json([]);
+  
+  const formatted = (data || []).map(m => ({
+    matchId: m.sender_id === userId ? m.receiver_id : m.sender_id,
+    author: m.sender_id,
+    authorName: '',
+    text: m.content
+  }));
+
+  res.json(formatted);
+});
+
+// Gestion Socket.io en temps réel
+io.on('connection', (socket) => {
+  const token = socket.handshake.auth.token;
+  if (token) {
+    socket.join(token);
   }
 
-  await supabase.from('likes').upsert([{ from_id: fromId, to_id: toId }]);
+  socket.on('send_like', async (data) => {
+    if (!token || !data.targetId) return;
+    await supabase.from('likes').upsert([{ from_id: token, to_id: data.targetId }]);
 
-  const updatedLikes = currentLikes + 1;
-  await supabase.from('profiles').update({ likes_count: updatedLikes, last_like_date: today }).eq('id', fromId);
+    // Vérifier s'il y a match réciproque
+    const { data: check } = await supabase.from('likes').select('id').eq('from_id', data.targetId).eq('to_id', token).limit(1);
+    if (check && check.length > 0) {
+      const { data: targetUser } = await supabase.from('profiles').select('*').eq('id', data.targetId).single();
+      socket.emit('match_success', { matchId: data.targetId, user: targetUser });
+      io.to(data.targetId).emit('match_success', { matchId: token, user: { id: token } });
+    } else {
+      io.to(data.targetId).emit('receive_like_notification', { senderId: token, senderName: 'Quelqu un' });
+    }
+  });
 
-  const { data: match } = await supabase.from('likes').select('id').eq('from_id', toId).eq('to_id', fromId).limit(1);
-  const isMatch = match && match.length > 0;
+  socket.on('send_message', async (data) => {
+    if (!token || !data.matchId || !data.text) return;
+    
+    await supabase.from('messages').insert([{
+      sender_id: token,
+      receiver_id: data.matchId,
+      content: data.text
+    }]);
 
-  res.json({
-    success: true,
-    isMatch: isMatch,
-    likesRemaining: (user.gender === 'femme' || user.is_subscribed) ? 'Illimités' : (10 - updatedLikes)
+    const msgObj = {
+      matchId: data.matchId,
+      author: token,
+      text: data.text
+    };
+
+    socket.emit('receive_message', msgObj);
+    io.to(data.matchId).emit('receive_message', { ...msgObj, matchId: token });
   });
 });
 
-app.post('/api/create-checkout', async (req, res) => {
-  const { userId } = req.body;
-
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: { name: 'Amour & Cie - Abonnement Privilège' },
-          unit_amount: 1990,
-          recurring: { interval: 'month' }
-        },
-        quantity: 1
-      }],
-      success_url: 'http://localhost:3000/?paiement=succes&user=' + userId,
-      cancel_url: 'http://localhost:3000/?paiement=annule',
-      client_reference_id: String(userId)
-    });
-
-    res.json({ url: session.url });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('Serveur Amour & Cie démarré sur le port ' + PORT);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('Serveur opérationnel sur le port ' + PORT);
 });
