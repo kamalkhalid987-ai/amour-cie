@@ -43,9 +43,7 @@ app.post('/register', async (req, res) => {
     return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
   }
 
-  const defaultPhoto = gender === 'femme'
-    ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80'
-    : 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&auto=format&fit=crop&q=80';
+ const defaultPhoto = '';
 
   const { data, error } = await supabase
     .from('profiles')
