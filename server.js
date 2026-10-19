@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
@@ -8,9 +8,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
-
 const stripe = Stripe(process.env.STRIPE_KEY);
-
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -29,10 +27,11 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
+// Récupérer les profils avec filtre de distance
 app.get('/api/users', async (req, res) => {
   const { userLat, userLon, maxKm } = req.query;
   const { data, error } = await supabase.from('profiles').select('*').order('id', { ascending: false });
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return res.status(500).json({ success: false, message: error.message });
 
   let results = data;
   if (userLat && userLon) {
@@ -54,61 +53,37 @@ app.get('/api/users', async (req, res) => {
   res.json(results);
 });
 
-app.get('/api/users/:id', async (req, res) => {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', req.params.id).single();
-  if (error) return res.status(404).json({ error: 'Membre introuvable.' });
-  res.json(data);
-});
-
-app.post('/api/upload-avatar', async (req, res) => {
-  const { name, imageBase64 } = req.body;
-  if (!name || !imageBase64) {
-    return res.status(400).json({ error: 'Photo manquante.' });
+// Route d'inscription corrigée pour correspondre au front
+app.post('/register', async (req, res) => {
+  const { name, email, password, age, city, gender, lookingFor, bio, photo, lat, lon } = req.body;
+  
+  if (!name || !email || !password || !age || !gender || !city) {
+    return res.status(400).json({ success: false, message: 'Tous les champs obligatoires ne sont pas remplis.' });
   }
 
-  try {
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    const fileName = name.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now() + '.jpg';
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, buffer, { contentType: 'image/jpeg', upsert: true });
-
-    if (uploadError) return res.status(500).json({ error: uploadError.message });
-
-    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-    res.json({ success: true, url: urlData.publicUrl });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/register', async (req, res) => {
-  const { name, age, gender, city, photo_url, lat, lon } = req.body;
-  if (!name || !age || !gender || !city) {
-    return res.status(400).json({ error: 'Tous les champs sont requis.' });
-  }
-
-  const { data: existing } = await supabase.from('profiles').select('id').eq('name', name).limit(1);
+  const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).limit(1);
   if (existing && existing.length > 0) {
-    return res.status(409).json({ error: 'Ce prénom est déjà utilisé. Choisissez-en un autre.' });
+    return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé. Choisissez-en un autre.' });
   }
 
   const defaultPhoto = gender === 'femme'
-    ? '[images.unsplash.com](https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80)'
-    : '[images.unsplash.com](https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&auto=format&fit=crop&q=80)';
+    ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80'
+    : 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&auto=format&fit=crop&q=80';
 
   const { data, error } = await supabase
     .from('profiles')
     .insert([{
       name: name,
+      email: email,
+      password: password,
       age: parseInt(age),
       gender: gender,
+      looking_for: lookingFor,
       city: city,
+      bio: bio || '',
       lat: lat ? parseFloat(lat) : 48.8566,
       lon: lon ? parseFloat(lon) : 2.3522,
-      photo_url: (photo_url && photo_url.trim() && !photo_url.startsWith('data:image')) ? photo_url : defaultPhoto,
+      photo: (photo && photo.trim() && photo.startsWith('data:image')) ? photo : defaultPhoto,
       is_subscribed: gender === 'femme',
       likes_count: 0,
       last_like_date: new Date().toISOString().split('T')[0]
@@ -116,16 +91,41 @@ app.post('/api/register', async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, user: data });
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  
+  // Renvoyer un token factice ou l'ID utilisateur pour le localStorage
+  res.json({ success: true, token: data.id, user: data });
 });
 
-app.post('/api/login', async (req, res) => {
-  const { name } = req.body;
-  const { data, error } = await supabase.from('profiles').select('*').eq('name', name).limit(1);
-  if (error) return res.status(500).json({ error: error.message });
-  if (!data || data.length === 0) return res.status(404).json({ error: 'Aucun membre avec ce prénom.' });
-  res.json({ success: true, user: data[0] });
+// Route de connexion corrigée
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email et mot de passe requis.' });
+  }
+
+  const { data, error } = await supabase.from('profiles').select('*').eq('email', email).limit(1);
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  if (!data || data.length === 0) return res.status(404).json({ success: false, message: 'Aucun compte associé à cet email.' });
+
+  const user = data[0];
+  if (user.password && user.password !== password) {
+    return res.status(401).json({ success: false, message: 'Mot de passe incorrect.' });
+  }
+
+  res.json({ success: true, token: user.id, user: user });
+});
+
+// Route de vérification de session /me
+app.get('/api/me', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ success: false, message: 'Non autorisé.' });
+  const token = authHeader.split(' ')[1];
+
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', token).single();
+  if (error || !data) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+  
+  res.json({ success: true, user: data });
 });
 
 app.post('/api/like', async (req, res) => {
@@ -160,19 +160,6 @@ app.post('/api/like', async (req, res) => {
   });
 });
 
-app.post('/api/subscribe', async (req, res) => {
-  const { userId } = req.body;
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ is_subscribed: true })
-    .eq('id', userId)
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, user: data });
-});
-
 app.post('/api/create-checkout', async (req, res) => {
   const { userId } = req.body;
 
@@ -189,8 +176,8 @@ app.post('/api/create-checkout', async (req, res) => {
         },
         quantity: 1
       }],
-      success_url: '[localhost](http://localhost:3000/?paiement=succes&user=)' + userId,
-      cancel_url: '[localhost](http://localhost:3000/?paiement=annule)',
+      success_url: 'http://localhost:3000/?paiement=succes&user=' + userId,
+      cancel_url: 'http://localhost:3000/?paiement=annule',
       client_reference_id: String(userId)
     });
 
@@ -200,72 +187,7 @@ app.post('/api/create-checkout', async (req, res) => {
   }
 });
 
-app.get('/api/messages/:user1/:user2', async (req, res) => {
-  const { user1, user2 } = req.params;
-
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .or(
-      'and(sender_id.eq.' + user1 + ',receiver_id.eq.' + user2 + '),' +
-      'and(sender_id.eq.' + user2 + ',receiver_id.eq.' + user1 + ')'
-    )
-    .order('created_at', { ascending: true });
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-app.post('/api/messages', async (req, res) => {
-  const { senderId, receiverId, content } = req.body;
-  if (!senderId || !receiverId || !content) {
-    return res.status(400).json({ error: 'Message vide.' });
-  }
-
-  const { data: sender } = await supabase
-    .from('profiles').select('gender, is_subscribed').eq('id', senderId).single();
-
-  if (sender && sender.gender === 'homme' && !sender.is_subscribed) {
-    return res.status(403).json({ error: 'ABONNEMENT_REQUIS' });
-  }
-
-  const { data, error } = await supabase
-    .from('messages')
-    .insert([{ sender_id: senderId, receiver_id: receiverId, content: content }])
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, message: data });
-});
-
-app.get('/api/notifications/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { lastCheck } = req.query;
-
-  const timeFilter = lastCheck || new Date(Date.now() - 3000).toISOString();
-
-  const { data: newMsgs } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('receiver_id', userId)
-    .gt('created_at', timeFilter)
-    .order('created_at', { ascending: true });
-
-  const { data: newLikes } = await supabase
-    .from('likes')
-    .select('*')
-    .eq('to_id', userId)
-    .gt('created_at', timeFilter);
-
-  res.json({
-    messages: newMsgs || [],
-    likes: newLikes || [],
-    timestamp: new Date().toISOString()
-  });
-});
-
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('Serveur Amour & Cie accessible sur le réseau, port ' + PORT);
+  console.log('Serveur Amour & Cie démarré sur le port ' + PORT);
 });
