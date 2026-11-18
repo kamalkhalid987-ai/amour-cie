@@ -301,23 +301,125 @@ async function publicMe(u) {
 
 // ---------- Compte ----------
 app.post('/api/register', wrap(async (req, res) => {
-    const { name, password, age, city, gender, interest, bio, photos, lat, lng } = req.body;
-    const email = String(req.body.email || '').trim().toLowerCase();
-    if (!name || !email || !password) return res.status(400).json({ error: 'Champs obligatoires manquants.' });
-    if (String(password).length < 6) return res.status(400).json({ error: 'Mot de passe trop court (6 caractères minimum).' });
-    const a = parseInt(age, 10) || 18;
-    if (a < 18 || a > 99) return res.status(400).json({ error: 'Vous devez avoir 18 ans ou plus.' });
-    if (!['Homme', 'Femme'].includes(gender) || !['Homme', 'Femme'].includes(interest)) return res.status(400).json({ error: 'Genre invalide.' });
-    const exists = await get('SELECT id FROM users WHERE lower(email) = ?', [email]);
-    if (exists) return res.status(409).json({ error: 'Cet email est déjà utilisé.' });
+    const {
+        name,
+        password,
+        age,
+        city,
+        gender,
+        interest,
+        bio,
+        photos,
+        lat,
+        lng
+    } = req.body;
 
-    const photoList = Array.isArray(photos) ? photos.filter(p => typeof p === 'string' && p.length < 3000000).slice(0, 6) : [];
-    const r = await run(
-        `INSERT INTO users (name, email, password, age, city, gender, interest, bio, photos, lat, lng)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [String(name).trim().slice(0, 40), email, hashPassword(String(password)), a, String(city || '').slice(0, 80), gender, interest,
-         String(bio || '').slice(0, 500), JSON.stringify(photoList), typeof lat === 'number' ? lat : null, typeof lng === 'number' ? lng : null]);
-    res.status(201).json({ id: r.lastID });
+    const email = String(req.body.email || '')
+        .trim()
+        .toLowerCase();
+
+    if (!name || !email || !password) {
+        return res.status(400).json({
+            error: 'Champs obligatoires manquants.'
+        });
+    }
+
+    if (String(password).length < 6) {
+        return res.status(400).json({
+            error: 'Mot de passe trop court (6 caractères minimum).'
+        });
+    }
+
+    const ageNumber = parseInt(age, 10) || 18;
+
+    if (ageNumber < 18 || ageNumber > 99) {
+        return res.status(400).json({
+            error: 'Vous devez avoir entre 18 et 99 ans.'
+        });
+    }
+
+    if (
+        !['Homme', 'Femme'].includes(gender) ||
+        !['Homme', 'Femme'].includes(interest)
+    ) {
+        return res.status(400).json({
+            error: 'Genre invalide.'
+        });
+    }
+
+    // Vérifie si l'adresse existe déjà dans Supabase
+    const { data: existingUser, error: existingUserError } = await supabase
+        .from('ac_users')
+        .select('id')
+        .ilike('email', email)
+        .maybeSingle();
+
+    if (existingUserError) {
+        console.error(
+            'ERREUR vérification email Supabase :',
+            existingUserError.message
+        );
+
+        return res.status(500).json({
+            error: 'Impossible de vérifier cette adresse e-mail.'
+        });
+    }
+
+    if (existingUser) {
+        return res.status(409).json({
+            error: 'Cet email est déjà utilisé.'
+        });
+    }
+
+    const photoList = Array.isArray(photos)
+        ? photos
+            .filter(p => typeof p === 'string' && p.length < 3000000)
+            .slice(0, 6)
+        : [];
+
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+
+    const newUser = {
+        name: String(name).trim().slice(0, 40),
+        email,
+        password: hashPassword(String(password)),
+        age: ageNumber,
+        city: String(city || '').trim().slice(0, 80),
+        gender,
+        interest,
+        bio: String(bio || '').trim().slice(0, 500),
+        photos: JSON.stringify(photoList),
+        lat: Number.isFinite(latitude) ? latitude : null,
+        lng: Number.isFinite(longitude) ? longitude : null
+    };
+
+    const { data: createdUser, error: insertError } = await supabase
+        .from('ac_users')
+        .insert(newUser)
+        .select('id')
+        .single();
+
+    if (insertError) {
+        console.error(
+            'ERREUR inscription Supabase :',
+            insertError.message
+        );
+
+        if (insertError.code === '23505') {
+            return res.status(409).json({
+                error: 'Cet email est déjà utilisé.'
+            });
+        }
+
+        return res.status(500).json({
+            error: 'Impossible de créer le compte.'
+        });
+    }
+
+    res.status(201).json({
+        id: createdUser.id
+    });
 }));
 
 app.post('/api/login', wrap(async (req, res) => {
