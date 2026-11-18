@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
@@ -44,7 +44,7 @@ app.use(cors());
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // Doit rester avant express.json()
-app.post('/api/stripe-webhook', ...
+
 
 // Doit rester avant express.json()
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -676,7 +676,7 @@ setInterval(async () => {
   await supabase.from('ac_signals').delete().lt('created_at', expiration);
 }, 60 * 1000);
 
-const server = app.listen(PORT, () => {
+
 
 const server = app.listen(PORT, () => {
   console.log(`Serveur Amour & Cie opérationnel sur le port ${PORT}`);
