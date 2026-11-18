@@ -488,18 +488,82 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
 // ---------- Decouvrir : seulement le genre recherche ----------
 app.get('/api/users', auth, wrap(async (req, res) => {
     const me = req.user;
-   const rows = await all(
-    `SELECT id, name, age, city, bio, photos, gender, lat, lng FROM users
-     WHERE id != ? AND (? = '' OR gender = ?)
-     AND id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-     AND id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
-     AND id NOT IN (SELECT skipped_user_id FROM skipped_profiles WHERE user_id = ?)`,
-    [me.id, me.interest || '', me.interest || '', me.id, me.id, me.id]
-);
+
+    // Profils bloques dans Supabase
+    const { data: blocksData, error: blocksError } = await supabase
+        .from('ac_blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${me.id},blocked_id.eq.${me.id}`);
+
+    if (blocksError) {
+        console.error('ERREUR blocks Supabase :', blocksError.message);
+    }
+
+    const blockedIds = new Set();
+
+    for (const b of (blocksData || [])) {
+        if (Number(b.blocker_id) === Number(me.id)) {
+            blockedIds.add(Number(b.blocked_id));
+        }
+
+        if (Number(b.blocked_id) === Number(me.id)) {
+            blockedIds.add(Number(b.blocker_id));
+        }
+    }
+
+    // Profils deja passes par swipe gauche
+    const { data: skippedData, error: skippedError } = await supabase
+        .from('ac_skipped_profiles')
+        .select('skipped_user_id')
+        .eq('user_id', me.id);
+
+    if (skippedError) {
+        console.error('ERREUR skipped Supabase :', skippedError.message);
+    }
+
+    const skippedIds = new Set(
+        (skippedData || []).map(x => Number(x.skipped_user_id))
+    );
+
+    // Profils disponibles
+    let query = supabase
+        .from('ac_users')
+        .select('id, name, age, city, bio, photos, gender, interest, lat, lng')
+        .neq('id', me.id);
+
+    // Conserve la regle actuelle : seulement le genre recherche
+    if (me.interest) {
+        query = query.eq('gender', me.interest);
+    }
+
+    const { data: usersData, error: usersError } = await query;
+
+    if (usersError) {
+        console.error('ERREUR users Supabase :', usersError.message);
+        return res.status(500).json({
+            error: 'Impossible de charger les profils.'
+        });
+    }
+
+    const rows = (usersData || []).filter(u =>
+        !blockedIds.has(Number(u.id)) &&
+        !skippedIds.has(Number(u.id))
+    );
+
     res.json(rows.map(u => {
         const distance = distKm(me, u);
-        const { lat, lng, ...safe } = u; // on ne partage jamais les coordonnees exactes
-        return { ...safe, photos: parsePhotos(u), distance };
+
+        const {
+            lat,
+            lng,
+            ...safe
+        } = u;
+
+        return {
+            ...safe,
+            photos: parsePhotos(u),
+            distance
+        };
     }));
 }));
 
