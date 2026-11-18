@@ -5,6 +5,12 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+);
 const stripe = require('stripe')(process.env.STRIPE_KEY);
 const webpush = require('web-push');
 webpush.setVapidDetails(
@@ -136,14 +142,52 @@ async function auth(req, res, next) {
     try {
         const h = req.headers.authorization || '';
         const token = h.startsWith('Bearer ') ? h.slice(7) : '';
-        if (!token) return res.status(401).json({ error: 'Non connecté.' });
-        const u = await get(
-            `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
-             WHERE s.token = ? AND s.created_at > datetime('now', '-30 days')`, [token]);
-        if (!u) return res.status(401).json({ error: 'Session expirée.' });
+
+        if (!token) {
+            return res.status(401).json({ error: 'Non connecté.' });
+        }
+
+        // 1. Recherche prioritaire dans Supabase
+        const limite = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: sessionSupabase, error: sessionError } = await supabase
+            .from('ac_sessions')
+            .select('user_id, created_at')
+            .eq('token', token)
+            .gte('created_at', limite)
+            .maybeSingle();
+
+        if (!sessionError && sessionSupabase) {
+            const { data: userSupabase, error: userError } = await supabase
+                .from('ac_users')
+                .select('*')
+                .eq('id', sessionSupabase.user_id)
+                .maybeSingle();
+
+            if (!userError && userSupabase) {
+                req.user = userSupabase;
+                req.token = token;
+                return next();
+            }
+        }
+
+        // 2. Secours SQLite pendant la migration
+        const u = await get(`
+            SELECT u.*
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ?
+              AND s.created_at > datetime('now', '-30 days')
+        `, [token]);
+
+        if (!u) {
+            return res.status(401).json({ error: 'Session expirée.' });
+        }
+
         req.user = u;
         req.token = token;
         next();
+
     } catch (e) {
         console.error('ERREUR auth :', e.message);
         res.status(500).json({ error: 'Erreur serveur' });
@@ -279,25 +323,142 @@ app.post('/api/register', wrap(async (req, res) => {
 app.post('/api/login', wrap(async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
-    if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
-    const key = req.ip + '|' + email;
-    if (tooManyAttempts(key)) return res.status(429).json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' });
 
-    const user = await get('SELECT * FROM users WHERE lower(email) = ?', [email]);
-    if (!user || !verifyPassword(password, user.password)) {
+    if (!email || !password) {
+        return res.status(400).json({
+            error: 'Email et mot de passe requis.'
+        });
+    }
+
+    const key = req.ip + ':' + email;
+
+    if (tooManyAttempts(key)) {
+        return res.status(429).json({
+            error: 'Trop de tentatives. Réessayez dans 15 minutes.'
+        });
+    }
+
+    // 1. Recherche prioritaire dans Supabase
+    const { data: userSupabase, error: userSupabaseError } = await supabase
+        .from('ac_users')
+        .select('*')
+        .ilike('email', email)
+        .maybeSingle();
+
+    if (userSupabaseError) {
+        console.error('ERREUR Supabase login :', userSupabaseError.message);
+    }
+
+    if (userSupabase) {
+        if (!verifyPassword(password, userSupabase.password)) {
+            noteFailure(key);
+
+            return res.status(401).json({
+                error: 'Email ou mot de passe incorrect.'
+            });
+        }
+
+        // Chiffre les anciens mots de passe encore stockés en clair
+        if (!userSupabase.password.startsWith('scrypt$')) {
+            const { error: passwordUpdateError } = await supabase
+                .from('ac_users')
+                .update({
+                    password: hashPassword(password)
+                })
+                .eq('id', userSupabase.id);
+
+            if (passwordUpdateError) {
+                console.error(
+                    'ERREUR mise à jour mot de passe Supabase :',
+                    passwordUpdateError.message
+                );
+            }
+        }
+
+        const token = crypto.randomBytes(24).toString('hex');
+
+        const { error: sessionInsertError } = await supabase
+            .from('ac_sessions')
+            .insert({
+                token,
+                user_id: userSupabase.id
+            });
+
+        if (sessionInsertError) {
+            console.error(
+                'ERREUR création session Supabase :',
+                sessionInsertError.message
+            );
+
+            return res.status(500).json({
+                error: 'Impossible de créer la session.'
+            });
+        }
+
+        attempts.delete(key);
+
+        return res.json({
+            token,
+            id: userSupabase.id,
+            name: userSupabase.name
+        });
+    }
+
+    // 2. Secours SQLite pendant la migration
+    const userSqlite = await get(
+        'SELECT * FROM users WHERE lower(email) = ?',
+        [email]
+    );
+
+    if (!userSqlite || !verifyPassword(password, userSqlite.password)) {
         noteFailure(key);
-        return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
+
+        return res.status(401).json({
+            error: 'Email ou mot de passe incorrect.'
+        });
     }
-    if (!user.password.startsWith('scrypt$')) { // chiffre les anciens mots de passe en clair
-        await run('UPDATE users SET password = ? WHERE id = ?', [hashPassword(password), user.id]);
+
+    if (!userSqlite.password.startsWith('scrypt$')) {
+        await run(
+            'UPDATE users SET password = ? WHERE id = ?',
+            [hashPassword(password), userSqlite.id]
+        );
     }
+
     const token = crypto.randomBytes(24).toString('hex');
-    await run('INSERT INTO sessions (token, user_id) VALUES (?, ?)', [token, user.id]);
-    res.json({ token, id: user.id, name: user.name });
+
+    await run(
+        'INSERT INTO sessions (token, user_id) VALUES (?, ?)',
+        [token, userSqlite.id]
+    );
+
+    attempts.delete(key);
+
+    res.json({
+        token,
+        id: userSqlite.id,
+        name: userSqlite.name
+    });
 }));
 
 app.post('/api/logout', auth, wrap(async (req, res) => {
-    await run('DELETE FROM sessions WHERE token = ?', [req.token]);
+
+    // Supprime d'abord la session dans Supabase
+    const { error: supabaseError } = await supabase
+        .from('ac_sessions')
+        .delete()
+        .eq('token', req.token);
+
+    if (supabaseError) {
+        console.error('ERREUR logout Supabase :', supabaseError.message);
+    }
+
+    // Secours SQLite pendant la migration
+    await run(
+        'DELETE FROM sessions WHERE token = ?',
+        [req.token]
+    );
+
     res.json({ ok: true });
 }));
 
