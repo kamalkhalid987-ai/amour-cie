@@ -672,70 +672,251 @@ app.get('/api/users', auth, wrap(async (req, res) => {
 // ---------- Likes ----------
 app.post('/api/like', auth, wrap(async (req, res) => {
     const me = req.user;
+    const meId = Number(me.id);
     const toId = parseInt(req.body.toId, 10);
     const type = req.body.type;
-    if (!toId || toId === me.id || !LIKE_TYPES.includes(type)) return res.status(400).json({ error: 'Requête invalide.' });
-    const target = await get('SELECT id FROM users WHERE id = ?', [toId]);
-    if (!target) return res.status(404).json({ error: 'Profil introuvable.' });
-    const blocked = await get(
-        `SELECT 1 AS x FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
-        [me.id, toId, toId, me.id]);
-    if (blocked) return res.status(403).json({ error: 'Action impossible.' });
 
-const existing = await get(
-    'SELECT id FROM likes WHERE from_id = ? AND to_id = ?',
-    [me.id, toId]
-);
+    if (
+        !toId ||
+        toId === meId ||
+        !LIKE_TYPES.includes(type)
+    ) {
+        return res.status(400).json({
+            error: 'Requête invalide.'
+        });
+    }
 
-if (existing) {
-    return res.json({
-        liked: true,
-        alreadyLiked: true
-    });
-}
+    // Vérifie que le profil cible existe dans Supabase
+    const { data: target, error: targetError } = await supabase
+        .from('ac_users')
+        .select('id')
+        .eq('id', toId)
+        .maybeSingle();
 
-    // Limite quotidienne : hommes sans abonnement uniquement
+    if (targetError) {
+        console.error(
+            'ERREUR profil cible Supabase :',
+            targetError.message
+        );
+
+        return res.status(500).json({
+            error: 'Impossible de vérifier le profil.'
+        });
+    }
+
+    if (!target) {
+        return res.status(404).json({
+            error: 'Profil introuvable.'
+        });
+    }
+
+    // Vérifie les blocages dans les deux sens
+    const { data: blockedRows, error: blockedError } = await supabase
+        .from('ac_blocks')
+        .select('blocker_id, blocked_id')
+        .or(
+            `and(blocker_id.eq.${meId},blocked_id.eq.${toId}),` +
+            `and(blocker_id.eq.${toId},blocked_id.eq.${meId})`
+        );
+
+    if (blockedError) {
+        console.error(
+            'ERREUR vérification blocage Supabase :',
+            blockedError.message
+        );
+
+        return res.status(500).json({
+            error: 'Impossible de vérifier le blocage.'
+        });
+    }
+
+    if ((blockedRows || []).length > 0) {
+        return res.status(403).json({
+            error: 'Action impossible.'
+        });
+    }
+
+    // Un profil déjà liké ne peut pas être liké une deuxième fois
+    const { data: existingLike, error: existingError } = await supabase
+        .from('ac_likes')
+        .select('id')
+        .eq('from_id', meId)
+        .eq('to_id', toId)
+        .limit(1)
+        .maybeSingle();
+
+    if (existingError) {
+        console.error(
+            'ERREUR vérification like Supabase :',
+            existingError.message
+        );
+
+        return res.status(500).json({
+            error: 'Impossible de vérifier le like.'
+        });
+    }
+
+    if (existingLike) {
+        return res.json({
+            liked: true,
+            alreadyLiked: true
+        });
+    }
+
+    // Date du jour au format YYYY-MM-DD
+    const today = new Intl.DateTimeFormat('fr-CA', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
+
+    // Limite quotidienne : hommes gratuits uniquement
     if (me.gender === 'Homme' && !isPremium(me)) {
-        const already = await get(`SELECT 1 AS x FROM daily_likes WHERE user_id = ? AND to_id = ? AND day = date('now','localtime')`, [me.id, toId]);
-        if (!already && (await likesToday(me.id)) >= FREE_LIKES_PER_DAY) {
+        const {
+            count: likesCount,
+            error: countError
+        } = await supabase
+            .from('ac_daily_likes')
+            .select('*', {
+                count: 'exact',
+                head: true
+            })
+            .eq('user_id', meId)
+            .eq('day', today);
+
+        if (countError) {
+            console.error(
+                'ERREUR compteur likes Supabase :',
+                countError.message
+            );
+
+            return res.status(500).json({
+                error: 'Impossible de vérifier la limite de likes.'
+            });
+        }
+
+        if ((likesCount || 0) >= FREE_LIKES_PER_DAY) {
             return res.status(402).json({
                 code: 'LIMIT',
-                error: `Limite de ${FREE_LIKES_PER_DAY} likes par jour atteinte. Passez Premium (${PREMIUM_PRICE_EUR} €/mois) pour des likes illimités.`
+                error:
+                    `Limite de ${FREE_LIKES_PER_DAY} likes par jour atteinte. ` +
+                    `Passez Premium (${PREMIUM_PRICE_EUR} €/mois) ` +
+                    `pour des likes illimités.`
             });
         }
     }
 
-    await run('INSERT INTO likes (from_id, to_id, type) VALUES (?, ?, ?)', [me.id, toId, type]);
-    await run(`INSERT OR IGNORE INTO daily_likes (user_id, to_id, day) VALUES (?, ?, date('now','localtime'))`, [me.id, toId]);
-// Notification PUSH : nouveau like reçu
-const pushSubs = await all(
-    'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
-    [toId]
-);
+    // Enregistre le like
+    const { error: likeInsertError } = await supabase
+        .from('ac_likes')
+        .insert({
+            from_id: meId,
+            to_id: toId,
+            type
+        });
 
-for (const sub of pushSubs) {
-    try {
-        await webpush.sendNotification(
-            {
-                endpoint: sub.endpoint,
-                keys: {
-                    p256dh: sub.p256dh,
-                    auth: sub.auth
-                }
-            },
-            JSON.stringify({
-                title: '❤️ Nouveau like',
-                body: `${me.name} vous a envoyé un like.`,
-                url: '/#likes'
-            })
+    if (likeInsertError) {
+        if (likeInsertError.code === '23505') {
+            return res.json({
+                liked: true,
+                alreadyLiked: true
+            });
+        }
+
+        console.error(
+            'ERREUR ajout like Supabase :',
+            likeInsertError.message
         );
-    } catch (err) {
-        console.error('Erreur notification PUSH like :', err.message);
+
+        return res.status(500).json({
+            error: 'Impossible d’enregistrer le like.'
+        });
     }
-}
-    const back = await get('SELECT 1 AS m FROM likes WHERE from_id = ? AND to_id = ?', [toId, me.id]);
-    res.json({ liked: true, match: !!back });
+
+    // Journal du like pour la limite quotidienne
+    const { error: dailyInsertError } = await supabase
+        .from('ac_daily_likes')
+        .upsert(
+            {
+                user_id: meId,
+                to_id: toId,
+                day: today
+            },
+            {
+                onConflict: 'user_id,to_id,day',
+                ignoreDuplicates: true
+            }
+        );
+
+    if (dailyInsertError) {
+        console.error(
+            'ERREUR daily_likes Supabase :',
+            dailyInsertError.message
+        );
+    }
+
+    // Notification PUSH : nouveau like reçu
+    const { data: pushSubs, error: pushError } = await supabase
+        .from('ac_push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .eq('user_id', toId);
+
+    if (pushError) {
+        console.error(
+            'ERREUR abonnements PUSH Supabase :',
+            pushError.message
+        );
+    }
+
+    for (const sub of (pushSubs || [])) {
+        try {
+            await webpush.sendNotification(
+                {
+                    endpoint: sub.endpoint,
+                    keys: {
+                        p256dh: sub.p256dh,
+                        auth: sub.auth
+                    }
+                },
+                JSON.stringify({
+                    title: '❤️ Nouveau like',
+                    body: `${me.name} vous a envoyé un like.`,
+                    url: '/#likes'
+                })
+            );
+        } catch (err) {
+            console.error(
+                'Erreur notification PUSH like :',
+                err.message
+            );
+        }
+    }
+
+    // Vérifie si le profil cible avait déjà liké en retour
+    const { data: backLike, error: backError } = await supabase
+        .from('ac_likes')
+        .select('id')
+        .eq('from_id', toId)
+        .eq('to_id', meId)
+        .limit(1)
+        .maybeSingle();
+
+    if (backError) {
+        console.error(
+            'ERREUR vérification match Supabase :',
+            backError.message
+        );
+    }
+
+    res.json({
+        liked: true,
+        match: !!backLike
+    });
 }));
+
+
+
 
 app.get('/api/activity', auth, wrap(async (req, res) => {
     const me = req.user.id;
