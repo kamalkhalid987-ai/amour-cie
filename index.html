@@ -646,7 +646,7 @@ const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { ur
 let token = null;
 try { localStorage.removeItem('token'); } catch (e) {}
 let me = null, myPos = null, allUsers = [], sentLikes = [], regPhotos = [], mePhotos = [];
-let convs = [], chatPeer = null, chatLastId = 0, currentTab = 'discover', chatBusy = false;
+let convs = [], chatPeer = null, chatLastId = 0, currentTab = 'discover', chatBusy = false, pendingAttachment = null;
 
 let pollTimers = [];
 
@@ -1312,7 +1312,31 @@ async function sendMessage(kind, content) {
   try { await api('POST', '/api/messages', { toId: chatPeer.id, kind, content }); await pollChat(true); }
   catch (err) { toast(err.message); }
 }
-$('sendBtn').onclick = async () => { const v = $('chatText').value.trim(); if (!v) return; $('chatText').value = ''; await sendMessage('text', v); };
+$('sendBtn').onclick = async () => {
+    // Une pièce jointe a été préparée
+    if (pendingAttachment) {
+        const attachment = pendingAttachment;
+
+        pendingAttachment = null;
+        $('chatText').value = '';
+
+        await sendMessage(
+            attachment.kind,
+            attachment.content
+        );
+
+        return;
+    }
+
+    // Sinon envoi d'un message texte normal
+    const v = $('chatText').value.trim();
+
+    if (!v) return;
+
+    $('chatText').value = '';
+
+    await sendMessage('text', v);
+};
 $('attachBtn').onclick = () => {
     $('chatFile').click();
 };
@@ -1341,11 +1365,17 @@ $('chatFile').onchange = async e => {
             kind = 'pdf';
         }
 
-        await sendMessage(kind, JSON.stringify({
-            name: file.name,
-            type: file.type,
-            data: dataUrl
-        }));
+       pendingAttachment = {
+    kind: kind,
+    content: JSON.stringify({
+        name: file.name,
+        type: file.type,
+        data: dataUrl
+    })
+};
+
+$('chatText').value = '📎 ' + file.name;
+toast('Fichier prêt. Cliquez sur Envoyer.');
 
     } catch (err) {
         toast('Impossible d’envoyer le fichier.');
