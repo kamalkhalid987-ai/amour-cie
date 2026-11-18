@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amour Compagnie</title>
+<style>
+  * { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, sans-serif; background: linear-gradient(135deg, #fff7f9 0%, #fdebf0 45%, #fff5f7 100%); color: #333; min-height: 100vh; }
+  header { background: #e63962; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 5; gap: 10px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 22px; }
+  .hright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  header button { background: #fff; color: #e63962; border: 0; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+  .pill { background: rgba(255,255,255,.2); padding: 6px 12px; border-radius: 16px; font-size: 13px; cursor: default; }
+  .pill.click { cursor: pointer; }
+  .hidden { display: none !important; }
+  .banner { width: 100%; max-height: 260px; object-fit: cover; display: block; }
+.card { background: rgba(255,255,255,0.96); width: calc(100% - 32px); max-width: 620px; margin: 32px auto; padding: 32px; border-radius: 24px; box-shadow: 0 12px 40px rgba(230,57,98,0.14); border: 1px solid rgba(230,57,98,0.08); }
+  .tabs { display: flex; margin-bottom: 16px; }
+ .tabs button { flex: 1; padding: 14px 18px; border: 0; background: #f8e8ed; color: #8a4053; cursor: pointer; font-weight: 700; font-size: 15px; transition: all .2s ease; }
+.tabs button:first-child { border-radius: 14px 0 0 14px; }
+.tabs button:last-child { border-radius: 0 14px 14px 0; }
+.tabs button.active { background: linear-gradient(135deg, #e63962, #d92b59); color: #fff; box-shadow: 0 5px 14px rgba(230,57,98,.22); }
+  label { display: block; margin-top: 10px; font-size: 14px; }
+input, select, textarea { width: 100%; padding: 13px 15px; margin-top: 6px; border: 1px solid #ead5db; border-radius: 12px; font-size: 15px; font-family: inherit; background: #fff; color: #333; outline: none; transition: border-color .2s ease, box-shadow .2s ease; }
+
+  .btn { width: 100%; margin-top: 16px; padding: 12px; background: #e63962; color: #fff; border: 0; border-radius: 24px; font-size: 16px; cursor: pointer; }
+  .btn.light { background: #f3d3da; color: #c2264d; margin-top: 8px; }
+  .msg { margin-top: 12px; text-align: center; font-size: 14px; }
+  .err { color: #c00; } .ok { color: #0a7a2f; }
+  .nav { display: flex; justify-content: center; gap: 8px; padding: 14px; flex-wrap: wrap; }
+  .nav button { padding: 9px 18px; border: 0; border-radius: 20px; background: #f3d3da; cursor: pointer; font-weight: bold; position: relative; }
+  .nav button.active { background: #e63962; color: #fff; }
+  .badge { background: #c00; color: #fff; border-radius: 10px; font-size: 11px; padding: 2px 6px; margin-left: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; padding: 10px 20px 30px; max-width: 1000px; margin: auto; }
+  .profile { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+  .profile img.main { width: 100%; height: 240px; object-fit: cover; display: block; }
+  .profile .body { padding: 12px; }
+  .profile h3 { margin: 0 0 4px; }
+  .profile small { color: #777; }
+  .profile p { margin: 8px 0; font-size: 14px; }
+  .likes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .likes button { border: 1px solid #f0b8c6; background: #fff; border-radius: 16px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+  .likes button.on { background: #e63962; color: #fff; border-color: #e63962; }
+  .thumbs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .thumbs img { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; }
+  .thumbs .t { position: relative; }
+  .thumbs .t span { position: absolute; top: 2px; right: 2px; background: #c00; color: #fff; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px; cursor: pointer; font-size: 12px; }
+  .section { max-width: 700px; margin: 0 auto; padding: 0 20px 30px; }
+  .row { display: flex; align-items: center; gap: 12px; background: #fff; padding: 10px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  .row img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .grow small { color: #777; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row button { border: 0; background: #e63962; color: #fff; border-radius: 16px; padding: 7px 12px; cursor: pointer; }
+  .row.click { cursor: pointer; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 20px; border-radius: 24px; z-index: 30; max-width: 90%; text-align: center; }
+
+  /* Chat */
+  .chat { background: #fff; border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.1); display: flex; flex-direction: column; height: 70vh; min-height: 420px; }
+  .chat-head { display: flex; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid #f3d3da; flex-wrap: wrap; }
+  .chat-head .name { flex: 1; font-weight: bold; }
+  .chat-head button { border: 0; background: #f3d3da; border-radius: 16px; padding: 7px 11px; cursor: pointer; }
+  .chat-msgs { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #fff7f9; }
+  .bubble { max-width: 78%; padding: 8px 12px; border-radius: 14px; font-size: 15px; word-wrap: break-word; }
+  .bubble small { display: block; font-size: 10px; opacity: .7; margin-top: 3px; }
+  .bubble.mine { align-self: flex-end; background: #e63962; color: #fff; }
+  .bubble.theirs { align-self: flex-start; background: #fff; border: 1px solid #f0b8c6; }
+  .bubble audio { max-width: 220px; height: 36px; }
+  .chat-input { display: flex; gap: 6px; padding: 10px; border-top: 1px solid #f3d3da; }
+  .chat-input input { margin: 0; flex: 1; }
+  .chat-input button { border: 0; border-radius: 20px; padding: 0 14px; cursor: pointer; background: #e63962; color: #fff; }
+  .chat-input button.mic { background: #f3d3da; color: #c2264d; }
+  .chat-input button.mic.rec { background: #c00; color: #fff; }
+
+  /* Appels et fenetres */
+  .overlay { position: fixed; inset: 0; background: #111; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .overlay video#remoteVideo { width: 100%; height: 100%; object-fit: contain; background: #000; }
+  .overlay video#localVideo { position: absolute; right: 14px; top: 14px; width: 130px; border-radius: 10px; border: 2px solid #fff; background: #000; }
+  .callname { position: absolute; top: 16px; left: 16px; color: #fff; font-size: 18px; text-shadow: 0 1px 4px #000; }
+  .callbar { position: absolute; bottom: 24px; display: flex; gap: 12px; align-items: center; }
+  .callbar button { border: 0; border-radius: 28px; padding: 14px 20px; cursor: pointer; font-size: 16px; background: #fff; }
+  .callbar button.red { background: #d9142f; color: #fff; }
+  .callbar span { color: #fff; background: rgba(0,0,0,.5); padding: 6px 12px; border-radius: 14px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal .box { background: #fff; border-radius: 16px; padding: 24px; max-width: 380px; width: 100%; text-align: center; }
+  .modal .box h3 { margin-top: 0; }
+  .modal .box button { margin: 6px; padding: 11px 18px; border: 0; border-radius: 22px; cursor: pointer; font-size: 15px; }
+  .modal .box .yes { background: #e63962; color: #fff; }
+  .modal .box .no { background: #eee; }
+  .modal .box img { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; }
+.modal .box .no { background: #eee; }
+.modal .box img { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; }
+
+/* ===== MON PROFIL - DESIGN MODERNE ===== */
+
+#tab-me .card {
+  max-width: 720px;
+  padding: 32px;
+  border-radius: 24px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 40px rgba(230,57,98,.12);
+  border: 1px solid rgba(230,57,98,.08);
+}
+
+#tab-me .card h3 {
+  margin: 0 0 24px;
+  font-size: 26px;
+  color: #e63962;
+  text-align: center;
+}
+
+#tab-me label {
+  margin-top: 16px;
+  font-weight: 600;
+  color: #444;
+}
+
+#tab-me input,
+#tab-me select,
+#tab-me textarea {
+  margin-top: 7px;
+  padding: 13px 14px;
+  border: 1px solid #eadde1;
+  border-radius: 12px;
+  background: #fffafb;
+}
+
+#tab-me input:focus,
+#tab-me select:focus,
+#tab-me textarea:focus {
+  outline: none;
+  border-color: #e63962;
+  box-shadow: 0 0 0 3px rgba(230,57,98,.10);
+  background: white;
+}
+
+#meGps {
+  width: 100%;
+  margin-top: 12px;
+  padding: 13px;
+  border: none;
+  border-radius: 14px;
+  background: #fde8ee;
+  color: #e63962;
+  font-weight: 600;
+}
+
+#tab-me .thumbs {
+  margin-top: 16px;
+  padding: 14px;
+  gap: 12px;
+  border-radius: 16px;
+  background: #fff7f9;
+  border: 1px dashed #f1b8c6;
+}
+
+#tab-me .thumbs .t,
+#tab-me .thumbs img {
+  width: 96px;
+  height: 96px;
+}
+
+#tab-me .thumbs img {
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+
+#meSave {
+  width: 100%;
+  margin-top: 26px;
+  padding: 15px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 7px 18px rgba(230,57,98,.22);
+}
+
+@media (max-width: 600px) {
+  #tab-me .card {
+    width: calc(100% - 20px);
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  #tab-me .thumbs .t,
+  #tab-me .thumbs img {
+    width: 82px;
+    height: 82px;
+  }
+}
+#tab-me .photo-upload-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 78px;
+  margin-top: 8px;
+  border: 2px dashed #f1b8c6;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff7f9, #fde8ee);
+  color: #e63962;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s;
+}
+
+#tab-me .photo-upload-btn span {
+  font-size: 12px;
+  font-weight: 500;
+  color: #92717a;
+}
+
+#tab-me .photo-upload-btn:hover {
+  border-color: #e63962;
+  background: #fde8ee;
+  transform: translateY(-1px);
+}
+/* ===== DECOUVRIR - DESIGN MODERNE ===== */
+
+#tab-discover .section {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Zone distance */
+#tab-discover .section > div:first-of-type {
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(230,57,98,.10);
+  border-radius: 20px;
+  padding: 18px 24px;
+  box-shadow: 0 8px 28px rgba(230,57,98,.08);
+}
+
+/* Cartes profils */
+#profiles .profile {
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(230,57,98,.08);
+  box-shadow: 0 10px 30px rgba(70,20,35,.10);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+#profiles .profile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(70,20,35,.15);
+}
+
+/* Grande photo */
+#profiles .profile img.main {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  display: block;
+}
+
+/* Informations */
+#profiles .profile .body {
+  padding: 18px;
+}
+
+#profiles .profile h3 {
+  margin: 0 0 5px;
+  font-size: 21px;
+  color: #292126;
+}
+
+#profiles .profile small {
+  color: #8e737b;
+  font-size: 13px;
+}
+
+#profiles .profile p {
+  color: #5f5156;
+  line-height: 1.45;
+  min-height: 40px;
+}
+
+/* Propositions */
+#profiles .likes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+#profiles .likes button {
+  border: 1px solid #f4c5d0;
+  background: #fff7f9;
+  color: #d92f59;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 600;
+  transition: .2s;
+}
+
+#profiles .likes button:not(:disabled):hover {
+  background: #e63962;
+  color: white;
+  border-color: #e63962;
+}
+
+/* Like déjà envoyé */
+#profiles .likes button.on {
+  background: linear-gradient(135deg, #e63962, #ef6687);
+  color: white;
+  border-color: transparent;
+}
+
+/* Curseur distance */
+#maxDist {
+  height: 6px;
+  cursor: pointer;
+  accent-color: #e63962;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+  #tab-discover .section {
+    padding: 8px;
+  }
+
+  #profiles {
+    display: block;
+    height: calc(100dvh - 150px);
+    overflow-y: auto;
+
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #profiles .profile {
+    width: 100%;
+    min-height: calc(100dvh - 150px);
+
+    margin: 0 0 10px;
+    border-radius: 20px;
+
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #profiles .profile img.main {
+    width: 100%;
+    height: min(62dvh, 520px);
+
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  #profiles .profile .body {
+    padding: 14px 16px 18px;
+    flex: 1;
+  }
+
+  #profiles .profile h3 {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+
+  #profiles .profile p {
+    min-height: 0;
+    margin: 8px 0;
+  }
+
+  #profiles .likes {
+    margin-top: 10px;
+  }
+}
+input[type="file"] {
+  padding: 8px;
+  background: #fff8fa;
+  border: 1px dashed #e7a7b7;
+  border-radius: 12px;
+  color: #777;
+}
+
+input[type="file"]::file-selector-button {
+  border: 0;
+  background: #e63962;
+  color: white;
+  padding: 10px 16px;
+  margin-right: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: #cf2f55;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>&#10084; Amour Compagnie</h1>
+  <div class="hright">
+    <span id="statusPill" class="pill hidden"></span>
+    <button id="logoutBtn" class="hidden">Déconnexion</button>
+  </div>
+</header>
+
+<!-- Connexion / Inscription -->
+<section id="authView">
+  <img class="banner" src="welcome-banner.jpg" alt="Bienvenue" onerror="this.style.display='none'">
+  <div class="card">
+    <div class="tabs">
+      <button id="tabLogin" class="active">Connexion</button>
+      <button id="tabRegister">Inscription</button>
+    </div>
+
+    <form id="loginForm">
+      <label>Email<input type="email" id="loginEmail" required></label>
+      <label>Mot de passe
+  <div style="position:relative;">
+    <input type="password" id="loginPassword" required style="padding-right:45px;">
+    <button
+      type="button"
+      id="loginPasswordEye"
+      style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:20px;padding:4px;"
+      title="Afficher le mot de passe"
+    >👁️</button>
+  </div>
+</label>
+      <button class="btn" type="submit">Se connecter</button>
+    </form>
+
+    <form id="registerForm" class="hidden">
+      <label>Prénom<input type="text" id="regName" required></label>
+      <label>Email<input type="email" id="regEmail" required></label>
+      <label>Mot de passe (6 caractères minimum)<input type="password" id="regPassword" minlength="6" required></label>
+      <label>Âge (18 ans minimum)<input type="number" id="regAge" min="18" max="99" value="18"></label>
+      <label>Ville<input type="text" id="regCity" placeholder="Tapez votre ville ou utilisez le GPS"></label>
+      <button class="btn light" type="button" id="regGps">&#128205; Utiliser ma position GPS</button>
+      <label>Vous êtes
+        <select id="regGender"><option value="Homme">Un homme</option><option value="Femme">Une femme</option></select>
+      </label>
+      <label>Vous cherchez
+        <select id="regInterest"><option value="Femme">Une femme</option><option value="Homme">Un homme</option></select>
+      </label>
+      <label>Présentation<textarea id="regBio" rows="3"></textarea></label>
+     <label>Photos (jusqu'à 6)<input type="file" id="regPhotos" accept="image/*" multiple></label>
+
+      <div class="thumbs" id="regThumbs"></div>
+      <button class="btn" type="submit">Créer mon compte</button>
+    </form>
+
+    <div id="message" class="msg"></div>
+  </div>
+</section>
+
+<!-- Application -->
+<section id="appView" class="hidden">
+  <div class="nav">
+    <button data-tab="discover" class="active">Découvrir</button>
+    <button data-tab="messages">Messages<span id="navBadge" class="badge hidden">0</span></button>
+    <button data-tab="likes">Mes likes</button>
+    <button data-tab="me">Mon profil</button>
+  </div>
+
+  <div id="tab-discover">
+    <div class="section" style="text-align:center">
+      <div id="searchInfo" style="margin-bottom:8px;color:#777;font-size:14px"></div>
+    <div style="max-width:360px;margin:18px auto 28px;text-align:center;">
+    <div style="font-weight:600;margin-bottom:10px;">
+        Distance maximale :
+        <span id="maxDistLabel">30 km</span>
+    </div>
+
+    <input
+        type="range"
+        id="maxDist"
+        min="5"
+      max="205"
+        step="5"
+        value="30"
+        style="width:100%;accent-color:#e52b63;"
+    >
+
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:#777;margin-top:4px;">
+        <span>5 km</span>
+      <span>🌍 Monde entier</span>
+    </div>
+</div>
+    
+ <div id="profiles" class="grid"></div>
+</div>
+</div>
+
+<div id="tab-messages" class="hidden section">
+
+    <div id="convList"></div>
+    <div id="chatPane" class="chat hidden">
+      <div class="chat-head">
+        <button id="chatBack">&larr;</button>
+        <span class="name" id="chatName"></span>
+        <button id="callAudio" title="Appel vocal">&#128222; Appel</button>
+        <button id="callVideo" title="Appel vidéo">&#127909; Vidéo</button>
+        <button id="blockBtn" title="Bloquer">&#128683;</button>
+      </div>
+      <div class="chat-msgs" id="chatMsgs"></div>
+     <div class="chat-input">
+  <button type="button" id="attachBtn" title="Joindre un fichier">📎</button>
+
+  <input
+    type="file"
+    id="chatFile"
+    accept="image/*,video/mp4,video/webm,application/pdf"
+    style="display:none;"
+  >
+
+  <button class="mic" id="micBtn" title="Message vocal">🎤</button>
+
+  <input
+    type="text"
+    id="chatText"
+    placeholder="Écrire un message..."
+    maxlength="2000"
+  >
+
+  <button id="sendBtn">Envoyer</button>
+</div>
+    </div>
+  </div>
+
+  <div id="tab-likes" class="hidden section">
+    <h3>&#128150; Matchs</h3><div id="matchesBox"></div>
+    <h3>Likes reçus</h3><div id="receivedBox"></div>
+  </div>
+
+  <div id="tab-me" class="hidden">
+    <div class="card">
+      <h3 style="margin-top:0">Mon profil</h3>
+      <label>Prénom<input type="text" id="meName"></label>
+      <label>Âge<input type="number" id="meAge" min="18" max="99"></label>
+      <label>Vous êtes
+        <select id="meGender"><option value="Homme">Un homme</option><option value="Femme">Une femme</option></select>
+      </label>
+      <label>Vous cherchez
+        <select id="meInterest"><option value="Femme">Une femme</option><option value="Homme">Un homme</option></select>
+      </label>
+      <label>Ville<input type="text" id="meCity"></label>
+      <button class="btn light" type="button" id="meGps">&#128205; Mettre à jour avec ma position GPS</button>
+      <label>Présentation<textarea id="meBio" rows="3"></textarea></label>
+      <label>Photos du profil</label>
+
+<label for="mePhotoInput" class="photo-upload-btn">
+  📷 Ajouter une photo
+  <span>Jusqu'à 6 photos</span>
+</label>
+
+<input
+  type="file"
+  id="mePhotoInput"
+  accept="image/*"
+  style="display:none;"
+>
+
+<div class="thumbs" id="meThumbs"></div>
+     
+      <button class="btn" id="meSave">Enregistrer</button>
+      <div id="meMsg" class="msg"></div>
+    </div>
+  </div>
+</section>
+<!-- Profil complet -->
+<div id="profileModal" class="modal hidden">
+  <div class="box" style="max-width:420px;width:92%;">
+    <button type="button" id="profileClose" class="no" style="float:right;">✕</button>
+
+    <img
+      id="profileMainPhoto"
+      src=""
+      alt=""
+      style="width:100%;max-height:520px;object-fit:cover;border-radius:14px;margin-top:10px;"
+    >
+
+    <div style="display:flex;justify-content:center;gap:12px;margin:12px 0;">
+      <button type="button" id="profilePrev">◀</button>
+      <span id="profilePhotoCount">1 / 1</span>
+      <button type="button" id="profileNext">▶</button>
+    </div>
+
+    <h2 id="profileFullName"></h2>
+    <div id="profileFullCity"></div>
+    <p id="profileFullBio"></p>
+  </div>
+</div>
+
+<!-- Appel en cours -->
+<div id="callOverlay" class="overlay hidden">
+  <video id="remoteVideo" autoplay playsinline></video>
+  <video id="localVideo" autoplay playsinline muted></video>
+  <div class="callname" id="callName"></div>
+  <div class="callbar">
+    <span id="callStatus"></span>
+    <button id="muteBtn">&#127908; Micro</button>
+    <button id="camBtn">&#128247; Caméra</button>
+    <button id="hangBtn" class="red">Raccrocher</button>
+  </div>
+</div>
+
+<!-- Appel entrant -->
+<div id="incoming" class="modal hidden">
+  <div class="box">
+    <img id="incImg" alt="">
+    <h3 id="incText"></h3>
+    <button class="yes" id="acceptBtn">Répondre</button>
+    <button class="no" id="declineBtn">Refuser</button>
+  </div>
+</div>
+
+<!-- Premium -->
+<div id="premiumModal" class="modal hidden">
+  <div class="box">
+    <h3>&#11088; Passez Premium</h3>
+    <p id="premiumText"></p>
+    <p><b>11 € par mois</b> : likes illimités.<br>Gratuit pour les femmes.</p>
+<button class="yes" id="subscribeBtn">S'abonner à 11 €/mois</button>
+    <button class="no" id="premiumClose">Plus tard</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const LIKE_TYPES = [
+  ['restaurant', '🍽️ Restaurant'], ['cinema', '🎬 Cinéma'], ['cafe', '☕ Café'],
+  ['balade', '🚶 Balade'], ['voyage', '✈️ Voyage'], ['cadeau', '🎁 Cadeau']
+];
+const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+
+let token = null;
+try { localStorage.removeItem('token'); } catch (e) {}
+let me = null, myPos = null, allUsers = [], sentLikes = [], regPhotos = [], mePhotos = [];
+let convs = [], chatPeer = null, chatLastId = 0, currentTab = 'discover', chatBusy = false;
+
+let pollTimers = [];
+
+function setMsg(el, t, ok) { el.textContent = t; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
+function toast(t) { const e = $('toast'); e.textContent = t; e.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.add('hidden'), 3000); }
+
+const API_BASE = window.location.origin === 'https://localhost'
+  ? 'https://amour-cie-1.onrender.com'
+  : '';
+async function api(method, url, data) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+ const r = await fetch(API_BASE + url, { method, headers, body: data ? JSON.stringify(data) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && token && !url.includes('/api/login')) { localLogout(); throw new Error(j.error || 'Session expirée.'); }
+  if (!r.ok) { const e = new Error(j.error || 'Erreur'); e.status = r.status; e.code = j.code; throw e; }
+  return j;
+}
+
+// ---------- Photos ----------
+function resizeImage(file, max = 600) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = reject;
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const s = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function renderThumbs(box, arr, onRemove) {
+    box.innerHTML = '';
+
+    arr.forEach((src, i) => {
+        const t = document.createElement('div');
+        t.className = 't';
+
+        const im = document.createElement('img');
+        im.src = src;
+
+        const star = document.createElement('button');
+        star.type = 'button';
+        star.textContent = i === 0 ? '⭐' : '☆';
+        star.title = i === 0 ? 'Photo principale' : 'Définir comme photo principale';
+        star.style.position = 'absolute';
+        star.style.left = '4px';
+        star.style.top = '4px';
+        star.style.zIndex = '2';
+        star.style.cursor = 'pointer';
+
+        star.onclick = () => {
+            if (i === 0) return;
+
+            const photo = arr.splice(i, 1)[0];
+            arr.unshift(photo);
+
+            renderThumbs(box, arr, onRemove);
+        };
+
+        const x = document.createElement('span');
+        x.textContent = '×';
+        x.onclick = () => onRemove(i);
+
+        t.append(im, star, x);
+        box.append(t);
+    });
+}
+
+
+// ---------- GPS ----------
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('GPS non disponible sur ce navigateur.'));
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => reject(new Error('Position refusée ou indisponible. Autorisez la localisation dans le navigateur.')),
+      { enableHighAccuracy: true, timeout: 15000 });
+  });
+}
+async function cityFromPos(pos) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.lat}&lon=${pos.lng}&accept-language=fr`);
+    const j = await r.json(); const a = j.address || {};
+    return a.city || a.town || a.village || a.municipality || a.county || '';
+  } catch (e) { return ''; }
+}
+
+// ---------- Connexion / Inscription ----------
+$('tabLogin').onclick = () => { $('loginForm').classList.remove('hidden'); $('registerForm').classList.add('hidden'); $('tabLogin').classList.add('active'); $('tabRegister').classList.remove('active'); setMsg($('message'), '', true); };
+$('tabRegister').onclick = () => { $('registerForm').classList.remove('hidden'); $('loginForm').classList.add('hidden'); $('tabRegister').classList.add('active'); $('tabLogin').classList.remove('active'); setMsg($('message'), '', true); };
+$('loginPasswordEye').onclick = () => {
+    const input = $('loginPassword');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        $('loginPasswordEye').textContent = '🙈';
+    } else {
+        input.type = 'password';
+        $('loginPasswordEye').textContent = '👁️';
+    }
+};
+function refreshRegThumbs() { renderThumbs($('regThumbs'), regPhotos, i => { regPhotos.splice(i, 1); refreshRegThumbs(); }); }
+$('regPhotos').onchange = async e => {
+  for (const f of [...e.target.files]) {
+    if (regPhotos.length < 6)
+        regPhotos.push(await resizeImage(f));
+}
+  e.target.value = ''; refreshRegThumbs();
+};
+$('regGps').onclick = async () => {
+  try {
+    setMsg($('message'), 'Recherche de votre position...', true);
+    myPos = await getPosition();
+    $('regCity').value = await cityFromPos(myPos);
+    setMsg($('message'), 'Position trouvée : ' + ($('regCity').value || 'ville inconnue'), true);
+  } catch (err) { setMsg($('message'), err.message, false); }
+};
+
+$('loginForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    const r = await api('POST', '/api/login', { email: $('loginEmail').value.trim(), password: $('loginPassword').value });
+    token = r.token;
+    try { localStorage.setItem('token', token); } catch (e2) {}
+    startApp();
+  } catch (err) { setMsg($('message'), err.message, false); }
+};
+
+$('registerForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await api('POST', '/api/register', {
+      name: $('regName').value.trim(), email: $('regEmail').value.trim(), password: $('regPassword').value,
+      age: parseInt($('regAge').value) || 18, city: $('regCity').value.trim(),
+      gender: $('regGender').value, interest: $('regInterest').value, bio: $('regBio').value.trim(),
+      photos: regPhotos, lat: myPos ? myPos.lat : null, lng: myPos ? myPos.lng : null
+    });
+    $('tabLogin').click();
+    $('loginEmail').value = $('regEmail').value;
+    regPhotos = []; refreshRegThumbs();
+    setMsg($('message'), 'Compte créé ! Vous pouvez vous connecter.', true);
+  } catch (err) { setMsg($('message'), err.message, false); }
+};
+
+function localLogout() {
+  token = null;
+  try { localStorage.removeItem('token'); } catch (e) {}
+  location.reload();
+}
+$('logoutBtn').onclick = async () => { try { await api('POST', '/api/logout'); } catch (e) {} localLogout(); };
+
+// ---------- Application ----------
+async function startApp() {
+  try { me = await api('GET', '/api/me'); }
+  catch (e) { return; }
+  $('authView').classList.add('hidden');
+  $('appView').classList.remove('hidden');
+  $('logoutBtn').classList.remove('hidden');
+  updateStatus();
+  fillProfileForm();
+  await loadDiscover();
+  await loadConvs();
+  pollTimers.push(setInterval(pollSignals, 1500));
+  pollTimers.push(setInterval(() => { loadConvs(); }, 6000));
+  pollTimers.push(setInterval(pollChat, 2000));
+}
+
+function updateStatus() {
+  const p = $('statusPill'); p.classList.remove('hidden', 'click'); p.onclick = null;
+  if (me.premium) p.textContent = '⭐ Premium jusqu\'au ' + new Date(me.premium_until).toLocaleDateString('fr-FR');
+  else if (me.likesLimit) { p.textContent = `❤ ${me.likesUsed}/${me.likesLimit} likes aujourd'hui · Premium`; p.classList.add('click'); p.onclick = () => openPremium(); }
+  else p.textContent = '✨ Compte gratuit';
+  $('searchInfo').textContent = me.interest ? 'Vous cherchez : ' + (me.interest === 'Femme' ? 'une femme' : 'un homme') : '';
+}
+async function refreshMe() { me = await api('GET', '/api/me'); updateStatus(); }
+
+function openPremium(msg) {
+  $('premiumText').textContent = msg || 'Les hommes peuvent liker 10 profils par jour gratuitement.';
+  $('premiumModal').classList.remove('hidden');
+}
+$('premiumClose').onclick = () => $('premiumModal').classList.add('hidden');
+$('subscribeBtn').onclick = async () => {
+    try {
+        const r = await api('POST', '/api/subscribe');
+
+        // MODE TEST LOCAL
+        if (r.test) {
+            $('premiumModal').classList.add('hidden');
+            await refreshMe();
+            toast('Premium activé (mode test).');
+            return;
+        }
+
+        // MODE PRODUCTION : redirection vers Stripe Checkout
+        if (r.url) {
+            window.location.href = r.url;
+            return;
+        }
+
+        toast('Impossible de démarrer l’abonnement.');
+    } catch (err) {
+        toast(err.message);
+    }
+};
+
+document.querySelectorAll('.nav button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.nav button').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
+  ['discover', 'messages', 'likes', 'me'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
+  if (tab === 'likes') loadLikes();
+  if (tab === 'discover') loadDiscover();
+  if (tab === 'messages') { loadConvs(); }
+}
+
+// ---------- Decouvrir ----------
+async function loadDiscover() {
+  allUsers = await api('GET', '/api/users');
+  const act = await api('GET', '/api/activity');
+  sentLikes = act.sent;
+  renderProfiles();
+}
+$('maxDist').oninput = () => {
+    const value = parseInt($('maxDist').value);
+
+    $('maxDistLabel').textContent =
+        value === 205 ? '🌍 Monde entier' : value + ' km';
+
+    renderProfiles();
+};
+
+function renderProfiles() {
+  const box = $('profiles'); box.innerHTML = '';
+  const max = parseInt($('maxDist').value) || 0;
+  let list = allUsers.slice();
+if (max && max < 205) {
+    list = list.filter(u =>
+        u.distance != null &&
+        u.distance <= max
+    );
+}
+  list.sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
+  if (!list.length) { box.innerHTML = '<p style="text-align:center;grid-column:1/-1">Aucun profil pour le moment.</p>'; return; }
+
+  list.forEach(u => {
+    const card = document.createElement('div'); card.className = 'profile';
+card.style.touchAction = 'pan-y';
+let swipeStartX = 0;
+let swipeStartY = 0;
+
+card.addEventListener('touchstart', (e) => {
+    const touch = e.changedTouches[0];
+    swipeStartX = touch.clientX;
+    swipeStartY = touch.clientY;
+}, { passive: true });
+card.addEventListener('touchend', async (e) => {
+    const touch = e.changedTouches[0];
+
+    const deltaX = touch.clientX - swipeStartX;
+    const deltaY = touch.clientY - swipeStartY;
+
+    // Mouvement surtout vertical = défilement normal
+    if (Math.abs(deltaY) >= Math.abs(deltaX)) return;
+
+    // Swipe trop court = aucune action
+    if (Math.abs(deltaX) < 80) return;
+
+ if (deltaX > 0) {
+    try {
+        const r = await api('POST', '/api/like', {
+            toId: u.id,
+            type: 'restaurant'
+        });
+
+        if (r.liked) {
+            if (!sentLikes.some(l => l.to_id === u.id && l.type === 'restaurant')) {
+                sentLikes.push({
+                    to_id: u.id,
+                    type: 'restaurant'
+                });
+            }
+
+            card.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+            card.style.transform = 'translateX(120%)';
+            card.style.opacity = '0';
+
+            if (r.match) {
+                toast('💖 C\'est un match avec ' + u.name + ' ! Vous pouvez discuter.');
+                loadConvs();
+            }
+
+            if (me.likesLimit) await refreshMe();
+
+           setTimeout(() => {
+    card.remove();
+
+    if (!$('profiles').querySelector('.profile')) {
+        $('profiles').innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:40px 20px;">
+                <div style="font-size:42px;margin-bottom:12px;">💗</div>
+                <h3>Vous avez vu tous les profils disponibles</h3>
+                <p style="color:#777;">
+                    Revenez plus tard ou élargissez votre zone de recherche.
+                </p>
+                <button type="button" id="showWorldwide" class="btn">
+                    🌍 Voir le monde entier
+                </button>
+            </div>
+        `;
+
+        $('showWorldwide').onclick = () => {
+            $('maxDist').value = 205;
+            $('maxDistLabel').textContent = '🌍 Monde entier';
+            renderProfiles();
+        };
+    }
+}, 250);
+
+        }
+    } catch (err) {
+        if (err.status === 402) {
+            openPremium(err.message);
+        } else {
+            toast(err.message);
+        }
+    }
+}else {
+    console.log('SWIPE GAUCHE ❌', u.name);
+try {
+    await api('POST', '/api/profiles/skip', {
+        skippedUserId: u.id
+    });
+} catch (err) {
+    toast(err.message);
+    return;
+}
+
+
+    card.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+    card.style.transform = 'translateX(-120%)';
+    card.style.opacity = '0';
+
+    setTimeout(() => {
+        card.remove();
+    }, 250);
+}
+}, { passive: true });
+let profileTapAllowed = true;
+
+    const img = document.createElement('img'); img.className = 'main'; img.src = u.photos[0]; img.alt = u.name;
+img.style.cursor = 'pointer';
+img.onclick = () => {
+    let photoIndex = 0;
+    const photos = Array.isArray(u.photos) && u.photos.length ? u.photos : [''];
+
+    function afficherPhotoProfil() {
+        $('profileMainPhoto').src = photos[photoIndex];
+        $('profilePhotoCount').textContent =
+            (photoIndex + 1) + ' / ' + photos.length;
+    }
+
+    $('profileFullName').textContent = u.name + ', ' + u.age;
+
+    $('profileFullCity').textContent =
+        (u.city || '') +
+        (u.distance != null ? ' · ' + u.distance + ' km' : '');
+
+    $('profileFullBio').textContent = u.bio || '';
+
+    $('profilePrev').onclick = () => {
+        photoIndex =
+            (photoIndex - 1 + photos.length) % photos.length;
+        afficherPhotoProfil();
+    };
+
+    $('profileNext').onclick = () => {
+        photoIndex =
+            (photoIndex + 1) % photos.length;
+        afficherPhotoProfil();
+    };
+
+    afficherPhotoProfil();
+    $('profileModal').classList.remove('hidden');
+};
+
+$('profileClose').onclick = () => {
+    $('profileModal').classList.add('hidden');
+};
+    const body = document.createElement('div'); body.className = 'body';
+    const h = document.createElement('h3'); h.textContent = u.name + ', ' + u.age;
+    const s = document.createElement('small'); s.textContent = (u.city || '') + (u.distance != null ? ' · ' + u.distance + ' km' : '');
+    const p = document.createElement('p'); p.textContent = u.bio || '';
+    const likes = document.createElement('div'); likes.className = 'likes';
+    LIKE_TYPES.forEach(([type, label]) => {
+      const b = document.createElement('button'); b.textContent = label;
+ const dejaLike = sentLikes.some(l => l.to_id === u.id);
+const likeExistant = sentLikes.find(l => l.to_id === u.id);
+
+if (dejaLike) {
+    if (likeExistant && likeExistant.type === type) {
+        b.classList.add('on');
+        b.textContent = '❤️ ' + label;
+        b.disabled = true;
+    } else {
+        b.style.display = 'none';
+    }
+} else {
+    b.onclick = async () => {
+        try {
+            const r = await api('POST', '/api/like', { toId: u.id, type });
+
+            if (r.liked) {
+                b.classList.add('on');
+                b.textContent = '❤️ Déjà liké';
+                b.disabled = true;
+
+                if (!sentLikes.some(l => l.to_id === u.id && l.type === type)) {
+                    sentLikes.push({ to_id: u.id, type });
+                }
+renderProfiles();
+
+            }
+
+            if (r.liked && r.match) {
+                toast('💖 C\'est un match avec ' + u.name + ' ! Vous pouvez discuter.');
+                loadConvs();
+            }
+
+            if (me.likesLimit) refreshMe();
+        } catch (err) {
+            if (err.status === 402) openPremium(err.message);
+            else toast(err.message);
+        }
+    };
+}
+
+      likes.append(b);
+    });
+    body.append(h, s, p, likes); card.append(img, body); box.append(card);
+  });
+}
+
+function typeLabel(t) { const f = LIKE_TYPES.find(x => x[0] === t); return f ? f[1] : t; }
+
+async function loadLikes() {
+  const act = await api('GET', '/api/activity');
+  const mBox = $('matchesBox'), rBox = $('receivedBox'); mBox.innerHTML = ''; rBox.innerHTML = '';
+  if (!act.matches.length) mBox.textContent = 'Pas encore de match.';
+  act.matches.forEach(m => {
+    const r = document.createElement('div'); r.className = 'row';
+    const i = document.createElement('img'); i.src = m.photos[0];
+    const t = document.createElement('div'); t.className = 'grow'; t.textContent = m.name + (m.city ? ' · ' + m.city : '');
+    const b = document.createElement('button'); b.textContent = '💬 Écrire';
+    b.onclick = () => { switchTab('messages'); openChat({ id: m.id, name: m.name, photos: m.photos }); };
+    r.append(i, t, b); mBox.append(r);
+  });
+  if (!act.received.length) rBox.textContent = 'Aucun like reçu pour le moment.';
+  act.received.forEach(l => {
+    const r = document.createElement('div'); r.className = 'row';
+    const i = document.createElement('img'); i.src = l.photos[0];
+    const t = document.createElement('div'); t.className = 'grow'; t.textContent = l.name + ' vous propose : ' + typeLabel(l.type);
+    r.append(i, t); rBox.append(r);
+  });
+}
+
+// ---------- Messagerie ----------
+async function loadConvs() {
+  try { convs = await api('GET', '/api/conversations'); } catch (e) { return; }
+  const total = convs.reduce((s, c) => s + c.unread, 0);
+  $('navBadge').textContent = total; $('navBadge').classList.toggle('hidden', !total);
+  renderConvs();
+}
+function renderConvs() {
+  const box = $('convList'); box.innerHTML = '';
+  if (!convs.length) { box.innerHTML = '<p style="text-align:center">Aucune conversation. Elles s\'ouvrent quand deux personnes se sont likées.</p>'; return; }
+  convs.forEach(c => {
+    const r = document.createElement('div'); r.className = 'row click';
+    const i = document.createElement('img'); i.src = c.photos[0];
+    const g = document.createElement('div'); g.className = 'grow';
+    const n = document.createElement('b'); n.textContent = c.name;
+    const s = document.createElement('small');
+    s.textContent = c.last_kind === 'audio' ? '🎤 Message vocal' : (c.last_text || 'Dites bonjour !');
+    g.append(n, s);
+    r.append(i, g);
+    if (c.unread) { const bd = document.createElement('span'); bd.className = 'badge'; bd.textContent = c.unread; r.append(bd); }
+    r.onclick = () => openChat(c);
+    box.append(r);
+  });
+}
+
+function fmtTime(s) {
+  if (!s) return '';
+
+  let d = new Date(s);
+
+  // Compatibilité avec les anciennes dates SQLite
+  if (isNaN(d.getTime())) {
+    d = new Date(String(s).replace(' ', 'T') + 'Z');
+  }
+
+  if (isNaN(d.getTime())) {
+    return '';
+  }
+
+  return d.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+function renderMsg(m) {
+  const d = document.createElement('div');
+  d.className = 'bubble ' + (m.from_id === me.id ? 'mine' : 'theirs');
+
+  if (m.kind === 'audio') {
+    const a = document.createElement('audio');
+    a.controls = true;
+    a.src = m.content;
+    d.append(a);
+
+  } else if (['image', 'video', 'pdf', 'file'].includes(m.kind)) {
+    try {
+      const f = JSON.parse(m.content);
+
+      if (m.kind === 'image') {
+        const img = document.createElement('img');
+        img.src = f.data;
+        img.alt = f.name || 'Photo';
+        img.style.maxWidth = '260px';
+        img.style.maxHeight = '320px';
+        img.style.borderRadius = '12px';
+        img.style.cursor = 'pointer';
+        img.onclick = () => {
+    const w = window.open('', '_blank');
+
+    if (!w) {
+        toast('Impossible d’ouvrir la photo.');
+        return;
+    }
+
+    w.document.body.style.margin = '0';
+    w.document.body.style.background = '#111';
+    w.document.body.style.display = 'flex';
+    w.document.body.style.alignItems = 'center';
+    w.document.body.style.justifyContent = 'center';
+    w.document.body.style.minHeight = '100vh';
+
+    const fullImg = w.document.createElement('img');
+    fullImg.src = f.data;
+    fullImg.alt = f.name || 'Photo';
+    fullImg.style.maxWidth = '100%';
+    fullImg.style.maxHeight = '100vh';
+    fullImg.style.objectFit = 'contain';
+
+    w.document.body.appendChild(fullImg);
+};
+        d.append(img);
+
+      } else if (m.kind === 'video') {
+        const v = document.createElement('video');
+        v.src = f.data;
+        v.controls = true;
+        v.playsInline = true;
+        v.style.maxWidth = '280px';
+        v.style.borderRadius = '12px';
+        d.append(v);
+
+      } else {
+        const link = document.createElement('a');
+        link.href = f.data;
+        link.download = f.name || 'fichier';
+        link.textContent =
+          m.kind === 'pdf'
+            ? '📄 ' + (f.name || 'Document PDF')
+            : '📎 ' + (f.name || 'Fichier');
+        link.style.color = 'inherit';
+        link.style.fontWeight = '600';
+        d.append(link);
+      }
+
+    } catch (e) {
+      d.append(document.createTextNode('📎 Fichier illisible'));
+    }
+
+  } else {
+    d.append(document.createTextNode(m.content));
+  }
+
+  const t = document.createElement('small');
+  t.textContent = fmtTime(m.created_at);
+  d.append(t);
+
+  return d;
+}
+async function openChat(peer) {
+  chatPeer = { id: peer.id, name: peer.name, photos: peer.photos }; chatLastId = 0;
+  $('convList').classList.add('hidden'); $('chatPane').classList.remove('hidden');
+  $('chatName').textContent = peer.name; $('chatMsgs').innerHTML = '';
+  await pollChat(true);
+}
+$('chatBack').onclick = () => { chatPeer = null; $('chatPane').classList.add('hidden'); $('convList').classList.remove('hidden'); loadConvs(); };
+
+
+
+
+async function pollChat(force) {
+  if (!chatPeer || (currentTab !== 'messages' && !force)) return;
+
+  // Empêche deux chargements simultanés du même message
+  if (chatBusy) return;
+  chatBusy = true;
+
+  try {
+    const rows = await api(
+      'GET',
+      `/api/messages?with=${chatPeer.id}&after=${chatLastId}`
+    );
+
+    if (!rows.length) return;
+
+    const box = $('chatMsgs');
+
+    const atBottom =
+      box.scrollTop + box.clientHeight >= box.scrollHeight - 60 ||
+      chatLastId === 0;
+
+    rows.forEach(m => {
+      // Sécurité supplémentaire contre les doublons
+      if (
+        m.id <= chatLastId ||
+        box.querySelector(`[data-message-id="${m.id}"]`)
+      ) {
+        return;
+      }
+
+      const el = renderMsg(m);
+      el.dataset.messageId = m.id;
+
+      box.append(el);
+      chatLastId = Math.max(chatLastId, Number(m.id));
+    });
+
+    if (atBottom) {
+      box.scrollTop = box.scrollHeight;
+    }
+
+  } catch (e) {
+    console.error('Erreur pollChat :', e);
+  } finally {
+    chatBusy = false;
+  }
+}
+async function sendMessage(kind, content) {
+  if (!chatPeer) return;
+  try { await api('POST', '/api/messages', { toId: chatPeer.id, kind, content }); await pollChat(true); }
+  catch (err) { toast(err.message); }
+}
+$('sendBtn').onclick = async () => { const v = $('chatText').value.trim(); if (!v) return; $('chatText').value = ''; await sendMessage('text', v); };
+$('attachBtn').onclick = () => {
+    $('chatFile').click();
+};
+$('chatFile').onchange = async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+
+    if (!file) return;
+
+    // Maximum 10 Mo
+    if (file.size > 10 * 1024 * 1024) {
+        toast('Fichier trop volumineux : 10 Mo maximum.');
+        return;
+    }
+
+    try {
+        const dataUrl = await blobToDataUrl(file);
+
+        let kind = 'file';
+
+        if (file.type.startsWith('image/')) {
+            kind = 'image';
+        } else if (file.type.startsWith('video/')) {
+            kind = 'video';
+        } else if (file.type === 'application/pdf') {
+            kind = 'pdf';
+        }
+
+        await sendMessage(kind, JSON.stringify({
+            name: file.name,
+            type: file.type,
+            data: dataUrl
+        }));
+
+    } catch (err) {
+        toast('Impossible d’envoyer le fichier.');
+    }
+};
+$('blockBtn').onclick = async () => {
+  if (!chatPeer || !confirm('Bloquer ' + chatPeer.name + ' ? Vous ne vous verrez plus.')) return;
+  try { await api('POST', '/api/block', { userId: chatPeer.id }); toast('Utilisateur bloqué.'); $('chatBack').click(); loadDiscover(); }
+  catch (err) { toast(err.message); }
+};
+
+// Messages vocaux
+let rec = null, recChunks = [], recTimer = null, recStart = 0;
+function blobToDataUrl(blob) { return new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(blob); }); }
+$('micBtn').onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  if (!window.MediaRecorder) return toast('Enregistrement vocal non pris en charge par ce navigateur.');
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { return toast('Micro refusé ou indisponible.'); }
+  const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); recChunks = [];
+  rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop()); clearInterval(recTimer);
+    const btn = $('micBtn'); btn.classList.remove('rec'); btn.innerHTML = '&#127908;';
+    const blob = new Blob(recChunks, { type: (rec.mimeType || 'audio/webm').split(';')[0] === 'video/webm' ? 'audio/webm' : (rec.mimeType || 'audio/webm') });
+    rec = null;
+    if (blob.size < 1000) return;
+    await sendMessage('audio', await blobToDataUrl(blob));
+  };
+  rec.start(); recStart = Date.now(); $('micBtn').classList.add('rec');
+  recTimer = setInterval(() => { const s = Math.floor((Date.now() - recStart) / 1000); $('micBtn').textContent = '⏹ ' + s + 's'; if (s >= 60 && rec) rec.stop(); }, 500);
+};
+
+// ---------- Appels vocaux / video (WebRTC) ----------
+let pc = null, localStream = null, callPeer = null, pendingIce = [], incomingOffer = null, inCall = false;
+
+function sendSignal(toId, type, data) { return api('POST', '/api/signal', { toId, type, data }).catch(() => {}); }
+function peerInfo(id) { const c = convs.find(x => x.id === id); return c ? { id: c.id, name: c.name, photos: c.photos } : { id, name: 'Votre match', photos: [''] }; }
+
+function setCallStatus(t) { $('callStatus').textContent = t; }
+function showCallUI(peer, kind, status) {
+  $('callName').textContent = (kind === 'video' ? '🎥 ' : '📞 ') + peer.name;
+  $('localVideo').classList.toggle('hidden', kind !== 'video');
+  $('camBtn').classList.toggle('hidden', kind !== 'video');
+  $('localVideo').srcObject = localStream;
+  setCallStatus(status); $('callOverlay').classList.remove('hidden');
+}
+function createPc() {
+  pc = new RTCPeerConnection(RTC_CONFIG);
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.ontrack = e => { $('remoteVideo').srcObject = e.streams[0]; };
+  pc.onicecandidate = e => { if (e.candidate && callPeer) sendSignal(callPeer.id, 'ice', e.candidate); };
+  pc.onconnectionstatechange = () => {
+    if (!pc) return;
+    if (pc.connectionState === 'connected') setCallStatus('Connecté');
+    if (pc.connectionState === 'failed') { toast('La connexion a échoué.'); endCall(true); }
+  };
+}
+async function startCall(kind) {
+  if (!chatPeer) return;
+  if (pc || inCall) return toast('Un appel est déjà en cours.');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Appels non disponibles (utilisez localhost ou HTTPS).');
+  try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === 'video' }); }
+  catch (e) { return toast('Micro ou caméra refusés ou indisponibles.'); }
+  inCall = true; callPeer = { ...chatPeer }; pendingIce = [];
+  createPc();
+  showCallUI(callPeer, kind, 'Appel en cours...');
+  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+  await sendSignal(callPeer.id, 'offer', { sdp: pc.localDescription, kind });
+  // sans reponse apres 45 s
+  const peerId = callPeer.id;
+  setTimeout(() => { if (pc && callPeer && callPeer.id === peerId && pc.connectionState !== 'connected' && !pc.remoteDescription) { toast('Pas de réponse.'); endCall(true); } }, 45000);
+}
+async function acceptCall() {
+  const off = incomingOffer; if (!off) return;
+  $('incoming').classList.add('hidden');
+  const kind = off.data.kind;
+  try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === 'video' }); }
+  catch (e) { toast('Micro ou caméra refusés.'); sendSignal(off.from_id, 'decline'); incomingOffer = null; return; }
+  inCall = true; callPeer = peerInfo(off.from_id); incomingOffer = null;
+  createPc();
+  showCallUI(callPeer, kind, 'Connexion...');
+  await pc.setRemoteDescription(off.data.sdp);
+  for (const c of pendingIce) { try { await pc.addIceCandidate(c); } catch (e) {} }
+  pendingIce = [];
+  const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+  await sendSignal(callPeer.id, 'answer', pc.localDescription);
+}
+function declineCall() {
+  if (incomingOffer) sendSignal(incomingOffer.from_id, 'decline');
+  incomingOffer = null; pendingIce = []; $('incoming').classList.add('hidden');
+}
+function endCall(notify) {
+  if (notify && callPeer) sendSignal(callPeer.id, 'hangup');
+  if (pc) { try { pc.close(); } catch (e) {} }
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  pc = null; localStream = null; callPeer = null; pendingIce = []; inCall = false;
+  $('remoteVideo').srcObject = null; $('localVideo').srcObject = null;
+  $('callOverlay').classList.add('hidden');
+}
+async function handleSignal(s) {
+  if (s.type === 'offer') {
+    if (inCall || incomingOffer) { sendSignal(s.from_id, 'decline'); return; }
+    incomingOffer = s; pendingIce = [];
+    const p = peerInfo(s.from_id);
+    $('incImg').src = (p.photos && p.photos[0]) || '';
+    $('incText').textContent = p.name + (s.data.kind === 'video' ? ' vous appelle en vidéo' : ' vous appelle');
+    $('incoming').classList.remove('hidden');
+  } else if (s.type === 'answer') {
+    if (pc && callPeer && callPeer.id === s.from_id) {
+      await pc.setRemoteDescription(s.data);
+      for (const c of pendingIce) { try { await pc.addIceCandidate(c); } catch (e) {} }
+      pendingIce = [];
+    }
+  } else if (s.type === 'ice') {
+    if (pc && pc.remoteDescription) { try { await pc.addIceCandidate(s.data); } catch (e) {} }
+    else if (s.data) pendingIce.push(s.data);
+  } else if (s.type === 'hangup' || s.type === 'decline') {
+    if (incomingOffer && incomingOffer.from_id === s.from_id) { incomingOffer = null; pendingIce = []; $('incoming').classList.add('hidden'); toast('Appel manqué.'); }
+    else if (callPeer && callPeer.id === s.from_id) { toast(s.type === 'decline' ? 'Appel refusé.' : 'Appel terminé.'); endCall(false); }
+  }
+}
+let signalBusy = false;
+async function pollSignals() {
+  if (!token || signalBusy) return;
+  signalBusy = true;
+  try { const list = await api('GET', '/api/signal'); for (const s of list) await handleSignal(s); }
+  catch (e) { /* silencieux */ }
+  signalBusy = false;
+}
+$('callAudio').onclick = () => startCall('audio');
+$('callVideo').onclick = () => startCall('video');
+$('acceptBtn').onclick = acceptCall;
+$('declineBtn').onclick = declineCall;
+$('hangBtn').onclick = () => endCall(true);
+$('muteBtn').onclick = () => { if (!localStream) return; const t = localStream.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $('muteBtn').style.opacity = t.enabled ? 1 : .5; } };
+$('camBtn').onclick = () => { if (!localStream) return; const t = localStream.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $('camBtn').style.opacity = t.enabled ? 1 : .5; } };
+
+// ---------- Mon profil ----------
+function fillProfileForm() {
+  $('meName').value = me.name || ''; $('meAge').value = me.age || 18;
+  $('meGender').value = me.gender || 'Homme'; $('meInterest').value = me.interest || 'Femme';
+  $('meCity').value = me.city || ''; $('meBio').value = me.bio || '';
+  mePhotos = (me.photos || []).filter(p => !p.startsWith('https://ui-avatars.com'));
+  refreshMeThumbs();
+}
+function refreshMeThumbs() { renderThumbs($('meThumbs'), mePhotos, i => { mePhotos.splice(i, 1); refreshMeThumbs(); }); }
+$('mePhotoInput').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (mePhotos.length >= 6) return setMsg($('meMsg'), '6 photos maximum.', false);
+  mePhotos.push(await resizeImage(f)); refreshMeThumbs();
+};
+$('meGps').onclick = async () => {
+  try {
+    setMsg($('meMsg'), 'Recherche de votre position...', true);
+    myPos = await getPosition();
+    $('meCity').value = await cityFromPos(myPos);
+    setMsg($('meMsg'), 'Position trouvée. Cliquez sur Enregistrer.', true);
+  } catch (err) { setMsg($('meMsg'), err.message, false); }
+};
+$('meSave').onclick = async () => {
+  try {
+    await api('PUT', '/api/profile', {
+      name: $('meName').value.trim(), age: parseInt($('meAge').value) || 18,
+      gender: $('meGender').value, interest: $('meInterest').value,
+      city: $('meCity').value.trim(), bio: $('meBio').value.trim(),
+      photos: mePhotos, lat: myPos ? myPos.lat : null, lng: myPos ? myPos.lng : null
+    });
+    await refreshMe();
+    setMsg($('meMsg'), 'Profil enregistré !', true);
+    toast('Profil enregistré !');
+    switchTab('discover');
+  } catch (err) { setMsg($('meMsg'), err.message, false); }
+};
+
+if (token) startApp();
+</script>
+<script>
+async function activerNotifications() {
+    try {
+        if (
+            !('Notification' in window) ||
+            !('serviceWorker' in navigator) ||
+            !('PushManager' in window)
+        ) {
+            console.log('Notifications push non supportées');
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+
+        console.log('Permission notifications :', permission);
+
+        if (permission !== 'granted') return;
+
+        const registration = await navigator.serviceWorker.ready;
+
+        const response = await fetch('/api/push/public-key');
+        const data = await response.json();
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = atob(base64);
+
+            return Uint8Array.from(
+                [...rawData].map(char => char.charCodeAt(0))
+            );
+        }
+
+        let subscription =
+            await registration.pushManager.getSubscription();
+
+        if (!subscription) {
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey:
+                    urlBase64ToUint8Array(data.publicKey)
+            });
+        }
+
+        await api(
+            'POST',
+            '/api/push/subscribe',
+            subscription.toJSON()
+        );
+
+        console.log('Abonnement PUSH enregistré');
+    } catch (err) {
+        console.error('Erreur activation notifications PUSH :', err);
+    }
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      console.log('Service Worker enregistré :', registration.scope);
+    } catch (error) {
+      console.error('Erreur Service Worker :', error);
+    }
+  });
+}
+</script>
+</body>
+</html>
