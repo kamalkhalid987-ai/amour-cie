@@ -1,1270 +1,678 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('./db');
 const { createClient } = require('@supabase/supabase-js');
-
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-);
 const stripe = require('stripe')(process.env.STRIPE_KEY);
 const webpush = require('web-push');
+
+const requiredEnv = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_KEY',
+  'VAPID_PUBLIC_KEY',
+  'VAPID_PRIVATE_KEY'
+];
+for (const key of requiredEnv) {
+  if (!process.env[key]) throw new Error(`Variable manquante : ${key}`);
+}
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
+
 webpush.setVapidDetails(
-    'mailto:contact@estimbtppro.fr',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
+  'mailto:contact@estimbtppro.fr',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
 );
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const FREE_LIKES_PER_DAY = 10;      // limite pour les hommes sans abonnement
-const PREMIUM_PRICE_EUR = 11;       // prix de l'abonnement mensuel
-const TEST_PAYMENT = process.env.TEST_PAYMENT !== 'false'; // mode test : active Premium sans paiement
+const FREE_LIKES_PER_DAY = 10;
+const PREMIUM_PRICE_EUR = 11;
+const TEST_PAYMENT = process.env.TEST_PAYMENT !== 'false';
 const LIKE_TYPES = ['restaurant', 'cinema', 'cafe', 'balade', 'voyage', 'cadeau'];
+const MESSAGE_KINDS = ['text', 'audio', 'image', 'video', 'pdf', 'file'];
+const SIGNAL_TYPES = ['offer', 'answer', 'ice', 'hangup', 'decline'];
 
 app.use(cors());
-app.use(cors());
 
-// Webhook Stripe : doit rester AVANT express.json()
-app.post(
-    '/api/stripe-webhook',
-    express.raw({ type: 'application/json' }),
-    async (req, res) => {
-        const signature = req.headers['stripe-signature'];
-console.log('WEBHOOK DEBUG:', {
-    contentType: req.headers['content-type'],
-    bodyIsBuffer: Buffer.isBuffer(req.body),
-    bodyLength: req.body ? req.body.length : 0,
-    signaturePresente: !!signature
+// Doit rester avant express.json()
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const signature = req.headers['stripe-signature'];
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const userId = Number(session.metadata?.user_id);
+      if (!userId) return res.status(400).json({ error: 'user_id absent' });
+
+      let premiumUntil = new Date();
+      premiumUntil.setDate(premiumUntil.getDate() + 31);
+
+      if (session.subscription) {
+        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+        if (subscription.current_period_end) {
+          premiumUntil = new Date(subscription.current_period_end * 1000);
+        }
+      }
+
+      const { error } = await supabase
+        .from('ac_users')
+        .update({ premium_until: premiumUntil.toISOString() })
+        .eq('id', userId);
+      if (error) throw error;
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Webhook Stripe :', err.message);
+    res.status(400).json({ error: err.message });
+  }
 });
 
-        let event;
-
-        try {
-            event = stripe.webhooks.constructEvent(
-                req.body,
-                signature,
-                process.env.STRIPE_WEBHOOK_SECRET
-            );
-        } catch (err) {
-            console.error('Signature webhook Stripe invalide :', err.message);
-            return res.status(400).send(`Webhook Error: ${err.message}`);
-        }
-
-        try {
-            if (event.type === 'checkout.session.completed') {
-                const session = event.data.object;
-                const userId = Number(session.metadata?.user_id);
-
-                if (!userId) {
-                    console.error('Webhook Stripe : user_id absent.');
-                    return res.status(400).json({
-                        error: 'user_id absent des metadata Stripe'
-                    });
-                }
-
-                let premiumUntil = new Date();
-                premiumUntil.setDate(premiumUntil.getDate() + 31);
-
-                if (session.subscription) {
-                    const subscription = await stripe.subscriptions.retrieve(
-                        session.subscription
-                    );
-
-                    if (subscription.current_period_end) {
-                        premiumUntil = new Date(
-                            subscription.current_period_end * 1000
-                        );
-                    }
-                }
-
-                await run(
-                    'UPDATE users SET premium_until = ? WHERE id = ?',
-                    [premiumUntil.toISOString(), userId]
-                );
-
-                console.log(
-                    `Premium Stripe activé pour utilisateur ${userId} jusqu'au ${premiumUntil.toISOString()}`
-                );
-            }
-
-            return res.json({ received: true });
-        } catch (err) {
-            console.error('Erreur traitement webhook Stripe :', err.message);
-            return res.status(500).json({
-                error: 'Erreur traitement webhook Stripe'
-            });
-        }
-    }
-);
-
-
-app.use(express.json({ limit: '15mb' })); // photos et messages vocaux
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---------- Utilitaires base de donnees ----------
-const run = (sql, p = []) => new Promise((resolve, reject) => db.run(sql, p, function (e) { e ? reject(e) : resolve({ lastID: this.lastID, changes: this.changes }); }));
-const get = (sql, p = []) => new Promise((resolve, reject) => db.get(sql, p, (e, r) => e ? reject(e) : resolve(r)));
-const all = (sql, p = []) => new Promise((resolve, reject) => db.all(sql, p, (e, r) => e ? reject(e) : resolve(r)));
-const wrap = fn => (req, res) => fn(req, res).catch(e => { console.error('ERREUR :', e.message); res.status(500).json({ error: 'Erreur serveur' }); });
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(err => {
+  console.error('ERREUR :', err);
+  if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+});
 
-// ---------- Mots de passe (hachage scrypt, sans paquet supplementaire) ----------
-function hashPassword(pw) {
-    const salt = crypto.randomBytes(16).toString('hex');
-    const h = crypto.scryptSync(pw, salt, 64).toString('hex');
-    return `scrypt$${salt}$${h}`;
-}
-function verifyPassword(pw, stored) {
-    if (!stored.startsWith('scrypt$')) return pw === stored; // ancien compte en clair
-    const [, salt, h] = stored.split('$');
-    const candidate = crypto.scryptSync(pw, salt, 64);
-    const expected = Buffer.from(h, 'hex');
-    return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected);
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
 }
 
-// Limitation des tentatives de connexion (10 echecs / 15 min)
+function verifyPassword(password, stored) {
+  if (!stored || typeof stored !== 'string') return false;
+  if (!stored.startsWith('scrypt$')) return password === stored;
+  const [, salt, hash] = stored.split('$');
+  if (!salt || !hash) return false;
+  const candidate = crypto.scryptSync(password, salt, 64);
+  const expected = Buffer.from(hash, 'hex');
+  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected);
+}
+
 const attempts = new Map();
 function tooManyAttempts(key) {
-    const now = Date.now();
-    const list = (attempts.get(key) || []).filter(t => now - t < 15 * 60 * 1000);
-    attempts.set(key, list);
-    return list.length >= 10;
+  const now = Date.now();
+  const values = (attempts.get(key) || []).filter(t => now - t < 15 * 60 * 1000);
+  attempts.set(key, values);
+  return values.length >= 10;
 }
-function noteFailure(key) { const l = attempts.get(key) || []; l.push(Date.now()); attempts.set(key, l); }
-
-// ---------- Authentification par jeton ----------
-async function auth(req, res, next) {
-    try {
-        const h = req.headers.authorization || '';
-        const token = h.startsWith('Bearer ') ? h.slice(7) : '';
-
-        if (!token) {
-            return res.status(401).json({ error: 'Non connecté.' });
-        }
-
-        // 1. Recherche prioritaire dans Supabase
-        const limite = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-        const { data: sessionSupabase, error: sessionError } = await supabase
-            .from('ac_sessions')
-            .select('user_id, created_at')
-            .eq('token', token)
-            .gte('created_at', limite)
-            .maybeSingle();
-
-        if (!sessionError && sessionSupabase) {
-            const { data: userSupabase, error: userError } = await supabase
-                .from('ac_users')
-                .select('*')
-                .eq('id', sessionSupabase.user_id)
-                .maybeSingle();
-
-            if (!userError && userSupabase) {
-                req.user = userSupabase;
-                req.token = token;
-                return next();
-            }
-        }
-
-        // 2. Secours SQLite pendant la migration
-        const u = await get(`
-            SELECT u.*
-            FROM sessions s
-            JOIN users u ON u.id = s.user_id
-            WHERE s.token = ?
-              AND s.created_at > datetime('now', '-30 days')
-        `, [token]);
-
-        if (!u) {
-            return res.status(401).json({ error: 'Session expirée.' });
-        }
-
-        req.user = u;
-        req.token = token;
-        next();
-
-    } catch (e) {
-        console.error('ERREUR auth :', e.message);
-        res.status(500).json({ error: 'Erreur serveur' });
-    }
+function noteFailure(key) {
+  const values = attempts.get(key) || [];
+  values.push(Date.now());
+  attempts.set(key, values);
 }
-// ---------- Notifications PUSH ----------
-app.get('/api/push/public-key', (req, res) => {
-    res.json({
-        publicKey: process.env.VAPID_PUBLIC_KEY
-    });
-});
-app.post('/api/push/subscribe', auth, wrap(async (req, res) => {
-    const subscription = req.body;
 
-    if (
-        !subscription ||
-        !subscription.endpoint ||
-        !subscription.keys ||
-        !subscription.keys.p256dh ||
-        !subscription.keys.auth
-    ) {
-        return res.status(400).json({
-            error: 'Abonnement push invalide.'
-        });
-    }
-
-    await run(
-        `INSERT INTO push_subscriptions
-        (user_id, endpoint, p256dh, auth)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(endpoint) DO UPDATE SET
-            user_id = excluded.user_id,
-            p256dh = excluded.p256dh,
-            auth = excluded.auth`,
-        [
-            req.user.id,
-            subscription.endpoint,
-            subscription.keys.p256dh,
-            subscription.keys.auth
-        ]
-    );
-
-    res.json({ ok: true });
-}));
-// ---------- Profils passes ----------
-app.post('/api/profiles/skip', auth, wrap(async (req, res) => {
-    const skippedUserId = Number(req.body.skippedUserId);
-
-    if (!Number.isInteger(skippedUserId) || skippedUserId <= 0) {
-        return res.status(400).json({
-            error: 'Profil invalide.'
-        });
-    }
-
-    if (skippedUserId === req.user.id) {
-        return res.status(400).json({
-            error: 'Profil invalide.'
-        });
-    }
-
-    await run(
-        `INSERT OR IGNORE INTO skipped_profiles
-         (user_id, skipped_user_id)
-         VALUES (?, ?)`,
-        [req.user.id, skippedUserId]
-    );
-
-    res.json({ ok: true });
-}));
-// ---------- Fonctions communes ----------
 function parsePhotos(user) {
-    let p = [];
-    try { p = typeof user.photos === 'string' ? JSON.parse(user.photos) : user.photos; } catch (e) { p = []; }
-    if (!Array.isArray(p) || p.length === 0 || !p[0]) {
-        p = [`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=512&background=random`];
-    }
-    return p;
+  let photos = [];
+  try {
+    photos = typeof user.photos === 'string' ? JSON.parse(user.photos) : user.photos;
+  } catch (_) {
+    photos = [];
+  }
+  if (!Array.isArray(photos) || !photos.length || !photos[0]) {
+    photos = [`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'Profil')}&size=512&background=random`];
+  }
+  return photos;
 }
-function isPremium(u) { return !!u.premium_until && new Date(u.premium_until) > new Date(); }
+
+function isPremium(user) {
+  return Boolean(user.premium_until) && new Date(user.premium_until) > new Date();
+}
+
+function parisDay() {
+  return new Intl.DateTimeFormat('fr-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+}
+
 function distKm(a, b) {
-    if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null;
-    const R = 6371, rad = x => x * Math.PI / 180;
-    const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-    return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+  if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null;
+  const R = 6371;
+  const rad = x => x * Math.PI / 180;
+  const dLat = rad(Number(b.lat) - Number(a.lat));
+  const dLng = rad(Number(b.lng) - Number(a.lng));
+  const h = Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(Number(a.lat))) * Math.cos(rad(Number(b.lat))) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
+
+async function getUser(id) {
+  const { data, error } = await supabase.from('ac_users').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 async function likesToday(userId) {
-    const r = await get(`SELECT COUNT(*) AS c FROM daily_likes WHERE user_id = ? AND day = date('now','localtime')`, [userId]);
-    return r.c;
+  const { count, error } = await supabase
+    .from('ac_daily_likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('day', parisDay());
+  if (error) throw error;
+  return count || 0;
 }
+
+async function publicMe(user) {
+  const premium = isPremium(user);
+  const limited = user.gender === 'Homme' && !premium;
+  return {
+    id: Number(user.id), name: user.name, email: user.email, age: user.age,
+    city: user.city, gender: user.gender, interest: user.interest, bio: user.bio,
+    photos: parsePhotos(user), lat: user.lat, lng: user.lng,
+    premium, premium_until: user.premium_until,
+    likesLimit: limited ? FREE_LIKES_PER_DAY : null,
+    likesUsed: limited ? await likesToday(user.id) : 0,
+    price: PREMIUM_PRICE_EUR
+  };
+}
+
+async function auth(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    if (!token) return res.status(401).json({ error: 'Non connecté.' });
+
+    const limit = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data: session, error } = await supabase
+      .from('ac_sessions')
+      .select('user_id, created_at')
+      .eq('token', token)
+      .gte('created_at', limit)
+      .maybeSingle();
+    if (error || !session) return res.status(401).json({ error: 'Session expirée.' });
+
+    const user = await getUser(session.user_id);
+    if (!user) return res.status(401).json({ error: 'Compte introuvable.' });
+
+    req.user = user;
+    req.token = token;
+    next();
+  } catch (err) {
+    console.error('Auth :', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+}
+
+async function getBlockedIds(userId) {
+  const { data, error } = await supabase
+    .from('ac_blocks')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+  if (error) throw error;
+  const ids = new Set();
+  for (const row of data || []) {
+    if (Number(row.blocker_id) === Number(userId)) ids.add(Number(row.blocked_id));
+    if (Number(row.blocked_id) === Number(userId)) ids.add(Number(row.blocker_id));
+  }
+  return ids;
+}
+
 async function isMatch(a, b) {
-    const r = await get(
-        `SELECT (SELECT COUNT(*) FROM likes WHERE from_id = ? AND to_id = ?) AS ab,
-                (SELECT COUNT(*) FROM likes WHERE from_id = ? AND to_id = ?) AS ba,
-                (SELECT COUNT(*) FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)) AS bl`,
-        [a, b, b, a, a, b, b, a]);
-    return r.ab > 0 && r.ba > 0 && r.bl === 0;
-}
-async function publicMe(u) {
-    const premium = isPremium(u);
-    const limited = u.gender === 'Homme' && !premium;
-    return {
-        id: u.id, name: u.name, email: u.email, age: u.age, city: u.city, gender: u.gender, interest: u.interest,
-        bio: u.bio, photos: parsePhotos(u), lat: u.lat, lng: u.lng,
-        premium, premium_until: u.premium_until,
-        likesLimit: limited ? FREE_LIKES_PER_DAY : null,
-        likesUsed: limited ? await likesToday(u.id) : 0,
-        price: PREMIUM_PRICE_EUR
-    };
+  const blocked = await getBlockedIds(a);
+  if (blocked.has(Number(b))) return false;
+
+  const { data, error } = await supabase
+    .from('ac_likes')
+    .select('from_id,to_id')
+    .or(`and(from_id.eq.${a},to_id.eq.${b}),and(from_id.eq.${b},to_id.eq.${a})`);
+  if (error) throw error;
+  const ab = (data || []).some(x => Number(x.from_id) === Number(a) && Number(x.to_id) === Number(b));
+  const ba = (data || []).some(x => Number(x.from_id) === Number(b) && Number(x.to_id) === Number(a));
+  return ab && ba;
 }
 
-// ---------- Compte ----------
+async function sendPush(userId, payload) {
+  const { data, error } = await supabase
+    .from('ac_push_subscriptions')
+    .select('endpoint,p256dh,auth')
+    .eq('user_id', userId);
+  if (error) {
+    console.error('Push subscriptions :', error.message);
+    return;
+  }
+  for (const sub of data || []) {
+    try {
+      await webpush.sendNotification({
+        endpoint: sub.endpoint,
+        keys: { p256dh: sub.p256dh, auth: sub.auth }
+      }, JSON.stringify(payload));
+    } catch (err) {
+      console.error('Push :', err.message);
+      if ([404, 410].includes(err.statusCode)) {
+        await supabase.from('ac_push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      }
+    }
+  }
+}
+
+app.get('/api/push/public-key', (_req, res) => res.json({ publicKey: process.env.VAPID_PUBLIC_KEY }));
+
+app.post('/api/push/subscribe', auth, wrap(async (req, res) => {
+  const sub = req.body;
+  if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+    return res.status(400).json({ error: 'Abonnement push invalide.' });
+  }
+  const { error } = await supabase.from('ac_push_subscriptions').upsert({
+    user_id: req.user.id,
+    endpoint: sub.endpoint,
+    p256dh: sub.keys.p256dh,
+    auth: sub.keys.auth
+  }, { onConflict: 'endpoint' });
+  if (error) throw error;
+  res.json({ ok: true });
+}));
+
 app.post('/api/register', wrap(async (req, res) => {
-    const {
-        name,
-        password,
-        age,
-        city,
-        gender,
-        interest,
-        bio,
-        photos,
-        lat,
-        lng
-    } = req.body;
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+  const name = String(req.body.name || '').trim().slice(0, 40);
+  const age = parseInt(req.body.age, 10) || 18;
+  const gender = req.body.gender;
+  const interest = req.body.interest;
 
-    const email = String(req.body.email || '')
-        .trim()
-        .toLowerCase();
+  if (!name || !email || !password) return res.status(400).json({ error: 'Champs obligatoires manquants.' });
+  if (password.length < 6) return res.status(400).json({ error: 'Mot de passe trop court (6 caractères minimum).' });
+  if (age < 18 || age > 99) return res.status(400).json({ error: 'Vous devez avoir entre 18 et 99 ans.' });
+  if (!['Homme', 'Femme'].includes(gender) || !['Homme', 'Femme'].includes(interest)) {
+    return res.status(400).json({ error: 'Genre invalide.' });
+  }
 
-    if (!name || !email || !password) {
-        return res.status(400).json({
-            error: 'Champs obligatoires manquants.'
-        });
-    }
+  const photos = Array.isArray(req.body.photos)
+    ? req.body.photos.filter(x => typeof x === 'string' && x.length < 3000000).slice(0, 6)
+    : [];
+  const lat = Number(req.body.lat);
+  const lng = Number(req.body.lng);
 
-    if (String(password).length < 6) {
-        return res.status(400).json({
-            error: 'Mot de passe trop court (6 caractères minimum).'
-        });
-    }
+  const { data, error } = await supabase.from('ac_users').insert({
+    name, email, password: hashPassword(password), age,
+    city: String(req.body.city || '').trim().slice(0, 80),
+    gender, interest,
+    bio: String(req.body.bio || '').trim().slice(0, 500),
+    photos: JSON.stringify(photos),
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null
+  }).select('id').single();
 
-    const ageNumber = parseInt(age, 10) || 18;
-
-    if (ageNumber < 18 || ageNumber > 99) {
-        return res.status(400).json({
-            error: 'Vous devez avoir entre 18 et 99 ans.'
-        });
-    }
-
-    if (
-        !['Homme', 'Femme'].includes(gender) ||
-        !['Homme', 'Femme'].includes(interest)
-    ) {
-        return res.status(400).json({
-            error: 'Genre invalide.'
-        });
-    }
-
-    // Vérifie si l'adresse existe déjà dans Supabase
-    const { data: existingUser, error: existingUserError } = await supabase
-        .from('ac_users')
-        .select('id')
-        .ilike('email', email)
-        .maybeSingle();
-
-    if (existingUserError) {
-        console.error(
-            'ERREUR vérification email Supabase :',
-            existingUserError.message
-        );
-
-        return res.status(500).json({
-            error: 'Impossible de vérifier cette adresse e-mail.'
-        });
-    }
-
-    if (existingUser) {
-        return res.status(409).json({
-            error: 'Cet email est déjà utilisé.'
-        });
-    }
-
-    const photoList = Array.isArray(photos)
-        ? photos
-            .filter(p => typeof p === 'string' && p.length < 3000000)
-            .slice(0, 6)
-        : [];
-
-    const latitude = Number(lat);
-    const longitude = Number(lng);
-
-    const newUser = {
-        name: String(name).trim().slice(0, 40),
-        email,
-        password: hashPassword(String(password)),
-        age: ageNumber,
-        city: String(city || '').trim().slice(0, 80),
-        gender,
-        interest,
-        bio: String(bio || '').trim().slice(0, 500),
-        photos: JSON.stringify(photoList),
-        lat: Number.isFinite(latitude) ? latitude : null,
-        lng: Number.isFinite(longitude) ? longitude : null
-    };
-
-    const { data: createdUser, error: insertError } = await supabase
-        .from('ac_users')
-        .insert(newUser)
-        .select('id')
-        .single();
-
-    if (insertError) {
-        console.error(
-            'ERREUR inscription Supabase :',
-            insertError.message
-        );
-
-        if (insertError.code === '23505') {
-            return res.status(409).json({
-                error: 'Cet email est déjà utilisé.'
-            });
-        }
-
-        return res.status(500).json({
-            error: 'Impossible de créer le compte.'
-        });
-    }
-
-    res.status(201).json({
-        id: createdUser.id
-    });
+  if (error?.code === '23505') return res.status(409).json({ error: 'Cet email est déjà utilisé.' });
+  if (error) throw error;
+  res.status(201).json({ id: data.id });
 }));
 
 app.post('/api/login', wrap(async (req, res) => {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '');
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+  if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
 
-    if (!email || !password) {
-        return res.status(400).json({
-            error: 'Email et mot de passe requis.'
-        });
-    }
+  const key = `${req.ip}:${email}`;
+  if (tooManyAttempts(key)) return res.status(429).json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' });
 
-    const key = req.ip + ':' + email;
+  const { data: user, error } = await supabase.from('ac_users').select('*').ilike('email', email).maybeSingle();
+  if (error) throw error;
+  if (!user || !verifyPassword(password, user.password)) {
+    noteFailure(key);
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
+  }
 
-    if (tooManyAttempts(key)) {
-        return res.status(429).json({
-            error: 'Trop de tentatives. Réessayez dans 15 minutes.'
-        });
-    }
+  if (!user.password.startsWith('scrypt$')) {
+    const { error: updateError } = await supabase
+      .from('ac_users').update({ password: hashPassword(password) }).eq('id', user.id);
+    if (updateError) throw updateError;
+  }
 
-    // 1. Recherche prioritaire dans Supabase
-    const { data: userSupabase, error: userSupabaseError } = await supabase
-        .from('ac_users')
-        .select('*')
-        .ilike('email', email)
-        .maybeSingle();
-
-    if (userSupabaseError) {
-        console.error('ERREUR Supabase login :', userSupabaseError.message);
-    }
-
-    if (userSupabase) {
-        if (!verifyPassword(password, userSupabase.password)) {
-            noteFailure(key);
-
-            return res.status(401).json({
-                error: 'Email ou mot de passe incorrect.'
-            });
-        }
-
-        // Chiffre les anciens mots de passe encore stockés en clair
-        if (!userSupabase.password.startsWith('scrypt$')) {
-            const { error: passwordUpdateError } = await supabase
-                .from('ac_users')
-                .update({
-                    password: hashPassword(password)
-                })
-                .eq('id', userSupabase.id);
-
-            if (passwordUpdateError) {
-                console.error(
-                    'ERREUR mise à jour mot de passe Supabase :',
-                    passwordUpdateError.message
-                );
-            }
-        }
-
-        const token = crypto.randomBytes(24).toString('hex');
-
-        const { error: sessionInsertError } = await supabase
-            .from('ac_sessions')
-            .insert({
-                token,
-                user_id: userSupabase.id
-            });
-
-        if (sessionInsertError) {
-            console.error(
-                'ERREUR création session Supabase :',
-                sessionInsertError.message
-            );
-
-            return res.status(500).json({
-                error: 'Impossible de créer la session.'
-            });
-        }
-
-        attempts.delete(key);
-
-        return res.json({
-            token,
-            id: userSupabase.id,
-            name: userSupabase.name
-        });
-    }
-
-    // 2. Secours SQLite pendant la migration
-    const userSqlite = await get(
-        'SELECT * FROM users WHERE lower(email) = ?',
-        [email]
-    );
-
-    if (!userSqlite || !verifyPassword(password, userSqlite.password)) {
-        noteFailure(key);
-
-        return res.status(401).json({
-            error: 'Email ou mot de passe incorrect.'
-        });
-    }
-
-    if (!userSqlite.password.startsWith('scrypt$')) {
-        await run(
-            'UPDATE users SET password = ? WHERE id = ?',
-            [hashPassword(password), userSqlite.id]
-        );
-    }
-
-    const token = crypto.randomBytes(24).toString('hex');
-
-    await run(
-        'INSERT INTO sessions (token, user_id) VALUES (?, ?)',
-        [token, userSqlite.id]
-    );
-
-    attempts.delete(key);
-
-    res.json({
-        token,
-        id: userSqlite.id,
-        name: userSqlite.name
-    });
+  const token = crypto.randomBytes(24).toString('hex');
+  const { error: sessionError } = await supabase.from('ac_sessions').insert({ token, user_id: user.id });
+  if (sessionError) throw sessionError;
+  attempts.delete(key);
+  res.json({ token, id: user.id, name: user.name });
 }));
 
 app.post('/api/logout', auth, wrap(async (req, res) => {
-
-    // Supprime d'abord la session dans Supabase
-    const { error: supabaseError } = await supabase
-        .from('ac_sessions')
-        .delete()
-        .eq('token', req.token);
-
-    if (supabaseError) {
-        console.error('ERREUR logout Supabase :', supabaseError.message);
-    }
-
-    // Secours SQLite pendant la migration
-    await run(
-        'DELETE FROM sessions WHERE token = ?',
-        [req.token]
-    );
-
-    res.json({ ok: true });
+  const { error } = await supabase.from('ac_sessions').delete().eq('token', req.token);
+  if (error) throw error;
+  res.json({ ok: true });
 }));
 
-app.get('/api/me', auth, wrap(async (req, res) => {
-    res.json(await publicMe(req.user));
-}));
+app.get('/api/me', auth, wrap(async (req, res) => res.json(await publicMe(req.user))));
 
 app.put('/api/profile', auth, wrap(async (req, res) => {
-    const { name, age, city, bio, photos, lat, lng, gender, interest } = req.body;
-    if (age != null && (age < 18 || age > 99)) return res.status(400).json({ error: 'Âge invalide (18 ans minimum).' });
-    if (gender && !['Homme', 'Femme'].includes(gender)) return res.status(400).json({ error: 'Genre invalide.' });
-    if (interest && !['Homme', 'Femme'].includes(interest)) return res.status(400).json({ error: 'Recherche invalide.' });
-    let photoJson = null;
-    if (Array.isArray(photos)) photoJson = JSON.stringify(photos.filter(p => typeof p === 'string' && p.length < 3000000).slice(0, 6));
+  const update = {};
+  if (req.body.name != null) update.name = String(req.body.name).trim().slice(0, 40);
+  if (req.body.city != null) update.city = String(req.body.city).trim().slice(0, 80);
+  if (req.body.bio != null) update.bio = String(req.body.bio).trim().slice(0, 500);
+  if (req.body.age != null) {
+    const age = Number(req.body.age);
+    if (age < 18 || age > 99) return res.status(400).json({ error: 'Âge invalide.' });
+    update.age = age;
+  }
+  if (req.body.gender != null) {
+    if (!['Homme', 'Femme'].includes(req.body.gender)) return res.status(400).json({ error: 'Genre invalide.' });
+    update.gender = req.body.gender;
+  }
+  if (req.body.interest != null) {
+    if (!['Homme', 'Femme'].includes(req.body.interest)) return res.status(400).json({ error: 'Recherche invalide.' });
+    update.interest = req.body.interest;
+  }
+  if (Array.isArray(req.body.photos)) {
+    update.photos = JSON.stringify(req.body.photos.filter(x => typeof x === 'string' && x.length < 3000000).slice(0, 6));
+  }
+  if (typeof req.body.lat === 'number') update.lat = req.body.lat;
+  if (typeof req.body.lng === 'number') update.lng = req.body.lng;
 
-    await run(
-        `UPDATE users SET name = COALESCE(?, name), age = COALESCE(?, age), city = COALESCE(?, city), bio = COALESCE(?, bio),
-         photos = COALESCE(?, photos), lat = COALESCE(?, lat), lng = COALESCE(?, lng),
-         gender = COALESCE(?, gender), interest = COALESCE(?, interest) WHERE id = ?`,
-        [name ? String(name).slice(0, 40) : null, age ?? null, city != null ? String(city).slice(0, 80) : null,
-         bio != null ? String(bio).slice(0, 500) : null, photoJson,
-         typeof lat === 'number' ? lat : null, typeof lng === 'number' ? lng : null,
-         gender || null, interest || null, req.user.id]);
-    res.json({ ok: true });
+  const { error } = await supabase.from('ac_users').update(update).eq('id', req.user.id);
+  if (error) throw error;
+  res.json({ ok: true });
 }));
 
-// ---------- Decouvrir : seulement le genre recherche ----------
+app.delete('/api/account', auth, wrap(async (req, res) => {
+  const id = Number(req.user.id);
+  await Promise.all([
+    supabase.from('ac_sessions').delete().eq('user_id', id),
+    supabase.from('ac_likes').delete().or(`from_id.eq.${id},to_id.eq.${id}`),
+    supabase.from('ac_daily_likes').delete().or(`user_id.eq.${id},to_id.eq.${id}`),
+    supabase.from('ac_messages').delete().or(`from_id.eq.${id},to_id.eq.${id}`),
+    supabase.from('ac_signals').delete().or(`from_id.eq.${id},to_id.eq.${id}`),
+    supabase.from('ac_blocks').delete().or(`blocker_id.eq.${id},blocked_id.eq.${id}`),
+    supabase.from('ac_push_subscriptions').delete().eq('user_id', id),
+    supabase.from('ac_skipped_profiles').delete().or(`user_id.eq.${id},skipped_user_id.eq.${id}`)
+  ]);
+  const { error } = await supabase.from('ac_users').delete().eq('id', id);
+  if (error) throw error;
+  res.json({ ok: true });
+}));
+
+app.post('/api/profiles/skip', auth, wrap(async (req, res) => {
+  const skipped = Number(req.body.skippedUserId);
+  if (!Number.isInteger(skipped) || skipped <= 0 || skipped === Number(req.user.id)) {
+    return res.status(400).json({ error: 'Profil invalide.' });
+  }
+  const { error } = await supabase.from('ac_skipped_profiles').upsert({
+    user_id: req.user.id, skipped_user_id: skipped
+  }, { onConflict: 'user_id,skipped_user_id', ignoreDuplicates: true });
+  if (error) throw error;
+  res.json({ ok: true });
+}));
+
 app.get('/api/users', auth, wrap(async (req, res) => {
-    const me = req.user;
+  const me = req.user;
+  const blocked = await getBlockedIds(me.id);
 
-    // Profils bloques dans Supabase
-    const { data: blocksData, error: blocksError } = await supabase
-        .from('ac_blocks')
-        .select('blocker_id, blocked_id')
-        .or(`blocker_id.eq.${me.id},blocked_id.eq.${me.id}`);
+  const { data: skipped, error: skipError } = await supabase
+    .from('ac_skipped_profiles').select('skipped_user_id').eq('user_id', me.id);
+  if (skipError) throw skipError;
+  const skippedIds = new Set((skipped || []).map(x => Number(x.skipped_user_id)));
 
-    if (blocksError) {
-        console.error('ERREUR blocks Supabase :', blocksError.message);
-    }
+  let query = supabase
+    .from('ac_users')
+    .select('id,name,age,city,bio,photos,gender,interest,lat,lng')
+    .neq('id', me.id);
+  if (me.interest) query = query.eq('gender', me.interest);
+  const { data, error } = await query;
+  if (error) throw error;
 
-    const blockedIds = new Set();
-
-    for (const b of (blocksData || [])) {
-        if (Number(b.blocker_id) === Number(me.id)) {
-            blockedIds.add(Number(b.blocked_id));
-        }
-
-        if (Number(b.blocked_id) === Number(me.id)) {
-            blockedIds.add(Number(b.blocker_id));
-        }
-    }
-
-    // Profils deja passes par swipe gauche
-    const { data: skippedData, error: skippedError } = await supabase
-        .from('ac_skipped_profiles')
-        .select('skipped_user_id')
-        .eq('user_id', me.id);
-
-    if (skippedError) {
-        console.error('ERREUR skipped Supabase :', skippedError.message);
-    }
-
-    const skippedIds = new Set(
-        (skippedData || []).map(x => Number(x.skipped_user_id))
-    );
-
-    // Profils disponibles
-    let query = supabase
-        .from('ac_users')
-        .select('id, name, age, city, bio, photos, gender, interest, lat, lng')
-        .neq('id', me.id);
-
-    // Conserve la regle actuelle : seulement le genre recherche
-    if (me.interest) {
-        query = query.eq('gender', me.interest);
-    }
-
-    const { data: usersData, error: usersError } = await query;
-
-    if (usersError) {
-        console.error('ERREUR users Supabase :', usersError.message);
-        return res.status(500).json({
-            error: 'Impossible de charger les profils.'
-        });
-    }
-
-    const rows = (usersData || []).filter(u =>
-        !blockedIds.has(Number(u.id)) &&
-        !skippedIds.has(Number(u.id))
-    );
-
-    res.json(rows.map(u => {
-        const distance = distKm(me, u);
-
-        const {
-            lat,
-            lng,
-            ...safe
-        } = u;
-
-        return {
-            ...safe,
-            photos: parsePhotos(u),
-            distance
-        };
+  res.json((data || [])
+    .filter(u => !blocked.has(Number(u.id)) && !skippedIds.has(Number(u.id)))
+    .map(u => {
+      const { lat, lng, ...safe } = u;
+      return { ...safe, photos: parsePhotos(u), distance: distKm(me, u) };
     }));
 }));
 
-// ---------- Likes ----------
 app.post('/api/like', auth, wrap(async (req, res) => {
-    const me = req.user;
-    const meId = Number(me.id);
-    const toId = parseInt(req.body.toId, 10);
-    const type = req.body.type;
+  const fromId = Number(req.user.id);
+  const toId = Number(req.body.toId);
+  const type = req.body.type;
+  if (!toId || toId === fromId || !LIKE_TYPES.includes(type)) {
+    return res.status(400).json({ error: 'Requête invalide.' });
+  }
 
-    if (
-        !toId ||
-        toId === meId ||
-        !LIKE_TYPES.includes(type)
-    ) {
-        return res.status(400).json({
-            error: 'Requête invalide.'
-        });
+  const target = await getUser(toId);
+  if (!target) return res.status(404).json({ error: 'Profil introuvable.' });
+  const blocked = await getBlockedIds(fromId);
+  if (blocked.has(toId)) return res.status(403).json({ error: 'Action impossible.' });
+
+  const { data: existing, error: existingError } = await supabase
+    .from('ac_likes').select('id,type').eq('from_id', fromId).eq('to_id', toId).maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return res.json({ liked: true, alreadyLiked: true, type: existing.type });
+
+  if (req.user.gender === 'Homme' && !isPremium(req.user)) {
+    if (await likesToday(fromId) >= FREE_LIKES_PER_DAY) {
+      return res.status(402).json({
+        code: 'LIMIT',
+        error: `Limite de ${FREE_LIKES_PER_DAY} likes par jour atteinte. Passez Premium (${PREMIUM_PRICE_EUR} €/mois) pour des likes illimités.`
+      });
     }
+  }
 
-    // Vérifie que le profil cible existe dans Supabase
-    const { data: target, error: targetError } = await supabase
-        .from('ac_users')
-        .select('id')
-        .eq('id', toId)
-        .maybeSingle();
+  const { error: likeError } = await supabase.from('ac_likes').insert({ from_id: fromId, to_id: toId, type });
+  if (likeError?.code === '23505') return res.json({ liked: true, alreadyLiked: true });
+  if (likeError) throw likeError;
 
-    if (targetError) {
-        console.error(
-            'ERREUR profil cible Supabase :',
-            targetError.message
-        );
+  const { error: dailyError } = await supabase.from('ac_daily_likes').upsert({
+    user_id: fromId, to_id: toId, day: parisDay()
+  }, { onConflict: 'user_id,to_id,day', ignoreDuplicates: true });
+  if (dailyError) console.error('Daily like :', dailyError.message);
 
-        return res.status(500).json({
-            error: 'Impossible de vérifier le profil.'
-        });
-    }
-
-    if (!target) {
-        return res.status(404).json({
-            error: 'Profil introuvable.'
-        });
-    }
-
-    // Vérifie les blocages dans les deux sens
-    const { data: blockedRows, error: blockedError } = await supabase
-        .from('ac_blocks')
-        .select('blocker_id, blocked_id')
-        .or(
-            `and(blocker_id.eq.${meId},blocked_id.eq.${toId}),` +
-            `and(blocker_id.eq.${toId},blocked_id.eq.${meId})`
-        );
-
-    if (blockedError) {
-        console.error(
-            'ERREUR vérification blocage Supabase :',
-            blockedError.message
-        );
-
-        return res.status(500).json({
-            error: 'Impossible de vérifier le blocage.'
-        });
-    }
-
-    if ((blockedRows || []).length > 0) {
-        return res.status(403).json({
-            error: 'Action impossible.'
-        });
-    }
-
-    // Un profil déjà liké ne peut pas être liké une deuxième fois
-    const { data: existingLike, error: existingError } = await supabase
-        .from('ac_likes')
-        .select('id')
-        .eq('from_id', meId)
-        .eq('to_id', toId)
-        .limit(1)
-        .maybeSingle();
-
-    if (existingError) {
-        console.error(
-            'ERREUR vérification like Supabase :',
-            existingError.message
-        );
-
-        return res.status(500).json({
-            error: 'Impossible de vérifier le like.'
-        });
-    }
-
-    if (existingLike) {
-        return res.json({
-            liked: true,
-            alreadyLiked: true
-        });
-    }
-
-    // Date du jour au format YYYY-MM-DD
-    const today = new Intl.DateTimeFormat('fr-CA', {
-        timeZone: 'Europe/Paris',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).format(new Date());
-
-    // Limite quotidienne : hommes gratuits uniquement
-    if (me.gender === 'Homme' && !isPremium(me)) {
-        const {
-            count: likesCount,
-            error: countError
-        } = await supabase
-            .from('ac_daily_likes')
-            .select('*', {
-                count: 'exact',
-                head: true
-            })
-            .eq('user_id', meId)
-            .eq('day', today);
-
-        if (countError) {
-            console.error(
-                'ERREUR compteur likes Supabase :',
-                countError.message
-            );
-
-            return res.status(500).json({
-                error: 'Impossible de vérifier la limite de likes.'
-            });
-        }
-
-        if ((likesCount || 0) >= FREE_LIKES_PER_DAY) {
-            return res.status(402).json({
-                code: 'LIMIT',
-                error:
-                    `Limite de ${FREE_LIKES_PER_DAY} likes par jour atteinte. ` +
-                    `Passez Premium (${PREMIUM_PRICE_EUR} €/mois) ` +
-                    `pour des likes illimités.`
-            });
-        }
-    }
-
-    // Enregistre le like
-    const { error: likeInsertError } = await supabase
-        .from('ac_likes')
-        .insert({
-            from_id: meId,
-            to_id: toId,
-            type
-        });
-
-    if (likeInsertError) {
-        if (likeInsertError.code === '23505') {
-            return res.json({
-                liked: true,
-                alreadyLiked: true
-            });
-        }
-
-        console.error(
-            'ERREUR ajout like Supabase :',
-            likeInsertError.message
-        );
-
-        return res.status(500).json({
-            error: 'Impossible d’enregistrer le like.'
-        });
-    }
-
-    // Journal du like pour la limite quotidienne
-    const { error: dailyInsertError } = await supabase
-        .from('ac_daily_likes')
-        .upsert(
-            {
-                user_id: meId,
-                to_id: toId,
-                day: today
-            },
-            {
-                onConflict: 'user_id,to_id,day',
-                ignoreDuplicates: true
-            }
-        );
-
-    if (dailyInsertError) {
-        console.error(
-            'ERREUR daily_likes Supabase :',
-            dailyInsertError.message
-        );
-    }
-
-    // Notification PUSH : nouveau like reçu
-    const { data: pushSubs, error: pushError } = await supabase
-        .from('ac_push_subscriptions')
-        .select('endpoint, p256dh, auth')
-        .eq('user_id', toId);
-
-    if (pushError) {
-        console.error(
-            'ERREUR abonnements PUSH Supabase :',
-            pushError.message
-        );
-    }
-
-    for (const sub of (pushSubs || [])) {
-        try {
-            await webpush.sendNotification(
-                {
-                    endpoint: sub.endpoint,
-                    keys: {
-                        p256dh: sub.p256dh,
-                        auth: sub.auth
-                    }
-                },
-                JSON.stringify({
-                    title: '❤️ Nouveau like',
-                    body: `${me.name} vous a envoyé un like.`,
-                    url: '/#likes'
-                })
-            );
-        } catch (err) {
-            console.error(
-                'Erreur notification PUSH like :',
-                err.message
-            );
-        }
-    }
-
-    // Vérifie si le profil cible avait déjà liké en retour
-    const { data: backLike, error: backError } = await supabase
-        .from('ac_likes')
-        .select('id')
-        .eq('from_id', toId)
-        .eq('to_id', meId)
-        .limit(1)
-        .maybeSingle();
-
-    if (backError) {
-        console.error(
-            'ERREUR vérification match Supabase :',
-            backError.message
-        );
-    }
-
-    res.json({
-        liked: true,
-        match: !!backLike
-    });
+  await sendPush(toId, { title: '❤️ Nouveau like', body: `${req.user.name} vous a envoyé un like.`, url: '/#likes' });
+  const match = await isMatch(fromId, toId);
+  res.json({ liked: true, match });
 }));
-
-
-
 
 app.get('/api/activity', auth, wrap(async (req, res) => {
-    const me = Number(req.user.id);
+  const me = Number(req.user.id);
+  const blocked = await getBlockedIds(me);
 
-    // Likes envoyés
-    const { data: sentData, error: sentError } = await supabase
-        .from('ac_likes')
-        .select('to_id, type')
-        .eq('from_id', me);
+  const [{ data: sent, error: sentError }, { data: receivedLikes, error: receivedError }] = await Promise.all([
+    supabase.from('ac_likes').select('to_id,type').eq('from_id', me),
+    supabase.from('ac_likes').select('from_id,type').eq('to_id', me).order('id', { ascending: false })
+  ]);
+  if (sentError) throw sentError;
+  if (receivedError) throw receivedError;
 
-    if (sentError) {
-        console.error('ERREUR likes envoyés Supabase :', sentError.message);
-        return res.status(500).json({ error: 'Impossible de charger les likes.' });
-    }
+  const receivedIds = [...new Set((receivedLikes || []).map(x => Number(x.from_id)).filter(id => !blocked.has(id)))];
+  let users = [];
+  if (receivedIds.length) {
+    const result = await supabase.from('ac_users').select('id,name,city,photos').in('id', receivedIds);
+    if (result.error) throw result.error;
+    users = result.data || [];
+  }
+  const byId = new Map(users.map(u => [Number(u.id), u]));
+  const received = (receivedLikes || []).map(l => {
+    const user = byId.get(Number(l.from_id));
+    return user ? { from_id: Number(l.from_id), type: l.type, name: user.name, photos: parsePhotos(user) } : null;
+  }).filter(Boolean);
 
-    // Likes reçus
-    const { data: receivedLikes, error: receivedError } = await supabase
-        .from('ac_likes')
-        .select('from_id, type')
-        .eq('to_id', me)
-        .order('id', { ascending: false });
-
-    if (receivedError) {
-        console.error('ERREUR likes reçus Supabase :', receivedError.message);
-        return res.status(500).json({ error: 'Impossible de charger les likes reçus.' });
-    }
-
-    // Blocages dans les deux sens
-    const { data: blocksData, error: blocksError } = await supabase
-        .from('ac_blocks')
-        .select('blocker_id, blocked_id')
-        .or(`blocker_id.eq.${me},blocked_id.eq.${me}`);
-
-    if (blocksError) {
-        console.error('ERREUR blocks Supabase :', blocksError.message);
-    }
-
-    const blockedIds = new Set();
-
-    for (const b of (blocksData || [])) {
-        if (Number(b.blocker_id) === me) {
-            blockedIds.add(Number(b.blocked_id));
-        }
-
-        if (Number(b.blocked_id) === me) {
-            blockedIds.add(Number(b.blocker_id));
-        }
-    }
-
-    // IDs des personnes ayant liké le compte
-    const receivedIds = [
-        ...new Set(
-            (receivedLikes || [])
-                .map(l => Number(l.from_id))
-                .filter(id => !blockedIds.has(id))
-        )
-    ];
-
-    let receivedUsers = [];
-
-    if (receivedIds.length) {
-        const { data, error } = await supabase
-            .from('ac_users')
-            .select('id, name, photos')
-            .in('id', receivedIds);
-
-        if (error) {
-            console.error('ERREUR profils likes reçus :', error.message);
-        } else {
-            receivedUsers = data || [];
-        }
-    }
-
-    const usersById = new Map(
-        receivedUsers.map(u => [Number(u.id), u])
-    );
-
-    const received = (receivedLikes || [])
-        .filter(l => !blockedIds.has(Number(l.from_id)))
-        .map(l => {
-            const u = usersById.get(Number(l.from_id));
-
-            if (!u) return null;
-
-            return {
-                type: l.type,
-                from_id: Number(l.from_id),
-                name: u.name,
-                photos: parsePhotos(u)
-            };
-        })
-        .filter(Boolean);
-
-    // Match = like dans les deux sens
-    const sentIds = new Set(
-        (sentData || []).map(l => Number(l.to_id))
-    );
-
-    const matchIds = receivedIds.filter(id =>
-        sentIds.has(id) &&
-        !blockedIds.has(id)
-    );
-
-    let matches = [];
-
-    if (matchIds.length) {
-        const { data, error } = await supabase
-            .from('ac_users')
-            .select('id, name, city, photos')
-            .in('id', matchIds);
-
-        if (error) {
-            console.error('ERREUR matchs Supabase :', error.message);
-        } else {
-            matches = (data || []).map(u => ({
-                ...u,
-                photos: parsePhotos(u)
-            }));
-        }
-    }
-
-    res.json({
-        sent: sentData || [],
-        received,
-        matches
-    });
+  const sentIds = new Set((sent || []).map(x => Number(x.to_id)));
+  const matchIds = receivedIds.filter(id => sentIds.has(id));
+  const matches = users.filter(u => matchIds.includes(Number(u.id))).map(u => ({ ...u, photos: parsePhotos(u) }));
+  res.json({ sent: sent || [], received, matches });
 }));
-// ---------- Messagerie (entre personnes qui se sont likees) ----------
+
 app.get('/api/conversations', auth, wrap(async (req, res) => {
-    const me = req.user.id;
-    const rows = await all(
-        `SELECT u.id, u.name, u.city, u.photos,
-            (SELECT kind FROM messages m WHERE (m.from_id = u.id AND m.to_id = ?) OR (m.from_id = ? AND m.to_id = u.id) ORDER BY m.id DESC LIMIT 1) AS last_kind,
-            (SELECT CASE WHEN kind = 'audio' THEN '' ELSE substr(content, 1, 80) END FROM messages m WHERE (m.from_id = u.id AND m.to_id = ?) OR (m.from_id = ? AND m.to_id = u.id) ORDER BY m.id DESC LIMIT 1) AS last_text,
-            (SELECT COUNT(*) FROM messages m WHERE m.from_id = u.id AND m.to_id = ? AND m.read_at IS NULL) AS unread
-         FROM users u
-         WHERE u.id IN (SELECT to_id FROM likes WHERE from_id = ?) AND u.id IN (SELECT from_id FROM likes WHERE to_id = ?)
-         AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-         AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)`,
-        [me, me, me, me, me, me, me, me, me]);
-    res.json(rows.map(r => ({ ...r, photos: parsePhotos(r) })));
+  const me = Number(req.user.id);
+  const blocked = await getBlockedIds(me);
+
+  const [{ data: sent, error: sentError }, { data: received, error: receivedError }] = await Promise.all([
+    supabase.from('ac_likes').select('to_id').eq('from_id', me),
+    supabase.from('ac_likes').select('from_id').eq('to_id', me)
+  ]);
+  if (sentError) throw sentError;
+  if (receivedError) throw receivedError;
+
+  const sentIds = new Set((sent || []).map(x => Number(x.to_id)));
+  const matchIds = [...new Set((received || []).map(x => Number(x.from_id)))]
+    .filter(id => sentIds.has(id) && !blocked.has(id));
+  if (!matchIds.length) return res.json([]);
+
+  const { data: users, error: usersError } = await supabase
+    .from('ac_users').select('id,name,city,photos').in('id', matchIds);
+  if (usersError) throw usersError;
+
+  const rows = await Promise.all((users || []).map(async user => {
+    const other = Number(user.id);
+    const { data: messages, error } = await supabase
+      .from('ac_messages')
+      .select('kind,content,from_id,to_id,read_at,created_at')
+      .or(`and(from_id.eq.${me},to_id.eq.${other}),and(from_id.eq.${other},to_id.eq.${me})`)
+      .order('id', { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    const last = messages?.[0];
+    const unread = (messages || []).filter(m => Number(m.from_id) === other && Number(m.to_id) === me && !m.read_at).length;
+    return {
+      ...user,
+      photos: parsePhotos(user),
+      last_kind: last?.kind || null,
+      last_text: last && last.kind !== 'audio' ? String(last.content || '').slice(0, 80) : '',
+      unread
+    };
+  }));
+  res.json(rows);
 }));
 
 app.get('/api/messages', auth, wrap(async (req, res) => {
-    const me = req.user.id;
-    const other = parseInt(req.query.with, 10);
-    const after = parseInt(req.query.after, 10) || 0;
-    if (!other || !(await isMatch(me, other))) return res.status(403).json({ error: 'Vous devez vous être likés mutuellement.' });
-    const rows = await all(
-        `SELECT id, from_id, to_id, kind, content, created_at FROM messages
-         WHERE id > ? AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)) ORDER BY id ASC LIMIT 200`,
-        [after, me, other, other, me]);
-    await run('UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE to_id = ? AND from_id = ? AND read_at IS NULL', [me, other]);
-    res.json(rows);
+  const me = Number(req.user.id);
+  const other = Number(req.query.with);
+  const after = Number(req.query.after) || 0;
+  if (!other || !(await isMatch(me, other))) {
+    return res.status(403).json({ error: 'Vous devez vous être likés mutuellement.' });
+  }
+
+  const { data, error } = await supabase
+    .from('ac_messages')
+    .select('id,from_id,to_id,kind,content,created_at')
+    .gt('id', after)
+    .or(`and(from_id.eq.${me},to_id.eq.${other}),and(from_id.eq.${other},to_id.eq.${me})`)
+    .order('id', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+
+  const { error: readError } = await supabase
+    .from('ac_messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('to_id', me)
+    .eq('from_id', other)
+    .is('read_at', null);
+  if (readError) console.error('Lecture messages :', readError.message);
+  res.json(data || []);
 }));
 
 app.post('/api/messages', auth, wrap(async (req, res) => {
-    const me = req.user.id;
-    const toId = parseInt(req.body.toId, 10);
-    const kind = req.body.kind;
-    const content = String(req.body.content || '');
-    if (!toId || !(await isMatch(me, toId))) return res.status(403).json({ error: 'Vous devez vous être likés mutuellement.' });
-    if (kind === 'text') {
-        if (!content.trim() || content.length > 2000) return res.status(400).json({ error: 'Message invalide.' });
-    } else if (kind === 'audio') {
-        if (!content.startsWith('data:audio/') || content.length > 8000000) return res.status(400).json({ error: 'Message vocal invalide ou trop long.' });
-   } else if (['image', 'video', 'pdf', 'file'].includes(kind)) {
-    if (!content || content.length > 14000000) {
-        return res.status(400).json({ error: 'Fichier invalide ou trop volumineux.' });
-    }
-} else {
-    return res.status(400).json({ error: 'Type de message invalide.' });
-}
-    const r = await run('INSERT INTO messages (from_id, to_id, kind, content) VALUES (?, ?, ?, ?)', [me, toId, kind, kind === 'text' ? content.trim() : content]);
-// Notification PUSH : nouveau message reçu
-const sender = await get(
-    'SELECT name FROM users WHERE id = ?',
-    [me]
-);
+  const me = Number(req.user.id);
+  const toId = Number(req.body.toId);
+  const kind = req.body.kind;
+  const content = String(req.body.content || '');
+  if (!toId || !(await isMatch(me, toId))) {
+    return res.status(403).json({ error: 'Vous devez vous être likés mutuellement.' });
+  }
+  if (!MESSAGE_KINDS.includes(kind)) return res.status(400).json({ error: 'Type de message invalide.' });
+  if (kind === 'text' && (!content.trim() || content.length > 2000)) return res.status(400).json({ error: 'Message invalide.' });
+  if (kind === 'audio' && (!content.startsWith('data:audio/') || content.length > 8000000)) return res.status(400).json({ error: 'Message vocal invalide ou trop long.' });
+  if (['image', 'video', 'pdf', 'file'].includes(kind) && (!content || content.length > 14000000)) {
+    return res.status(400).json({ error: 'Fichier invalide ou trop volumineux.' });
+  }
 
-const pushSubs = await all(
-    'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
-    [toId]
-);
+  const { data, error } = await supabase.from('ac_messages').insert({
+    from_id: me, to_id: toId, kind, content: kind === 'text' ? content.trim() : content
+  }).select('id').single();
+  if (error) throw error;
 
-
-for (const sub of pushSubs) {
-    try {
-        await webpush.sendNotification(
-            {
-                endpoint: sub.endpoint,
-                keys: {
-                    p256dh: sub.p256dh,
-                    auth: sub.auth
-                }
-            },
-            JSON.stringify({
-                title: '💬 Nouveau message',
-                body: `${sender?.name || 'Quelqu’un'} vous a envoyé un message.`,
-                url: '/#messages'
-            })
-        );
-    } catch (err) {
-        console.error(
-            'Erreur notification PUSH message :',
-            err.message
-        );
-    }
-}
-    res.status(201).json({ id: r.lastID });
+  await sendPush(toId, { title: '💬 Nouveau message', body: `${req.user.name} vous a envoyé un message.`, url: '/#messages' });
+  res.status(201).json({ id: data.id });
 }));
 
-// ---------- Appels vocaux / video (signalisation WebRTC) ----------
 app.post('/api/signal', auth, wrap(async (req, res) => {
-    const me = req.user.id;
-    const toId = parseInt(req.body.toId, 10);
-    const type = req.body.type;
-    if (!['offer', 'answer', 'ice', 'hangup', 'decline'].includes(type)) return res.status(400).json({ error: 'Signal invalide.' });
-    if (!toId || !(await isMatch(me, toId))) return res.status(403).json({ error: 'Appel impossible.' });
-    const data = JSON.stringify(req.body.data ?? null);
-    if (data.length > 100000) return res.status(400).json({ error: 'Signal trop gros.' });
-    await run('INSERT INTO signals (from_id, to_id, type, data) VALUES (?, ?, ?, ?)', [me, toId, type, data]);
-// Notification PUSH : appel entrant
-if (type === 'offer') {
-    const offerData = req.body.data || {};
-    const caller = await get(
-        'SELECT name FROM users WHERE id = ?',
-        [me]
-    );
+  const me = Number(req.user.id);
+  const toId = Number(req.body.toId);
+  const type = req.body.type;
+  if (!SIGNAL_TYPES.includes(type)) return res.status(400).json({ error: 'Signal invalide.' });
+  if (!toId || !(await isMatch(me, toId))) return res.status(403).json({ error: 'Appel impossible.' });
+  const payload = JSON.stringify(req.body.data ?? null);
+  if (payload.length > 100000) return res.status(400).json({ error: 'Signal trop gros.' });
 
-    const pushSubs = await all(
-        'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
-        [toId]
-    );
-
-    const isVideo = offerData.kind === 'video';
-
-    for (const sub of pushSubs) {
-        try {
-            await webpush.sendNotification(
-                {
-                    endpoint: sub.endpoint,
-                    keys: {
-                        p256dh: sub.p256dh,
-                        auth: sub.auth
-                    }
-                },
-                JSON.stringify({
-                    title: isVideo ? '🎥 Appel vidéo entrant' : '📞 Appel entrant',
-                    body: `${caller?.name || 'Quelqu’un'} vous appelle.`,
-                    url: '/#messages'
-                })
-            );
-        } catch (err) {
-            console.error(
-                'Erreur notification PUSH appel :',
-                err.message
-            );
-        }
-    }
-}
-    res.json({ ok: true });
+  const { error } = await supabase.from('ac_signals').insert({ from_id: me, to_id: toId, type, data: payload });
+  if (error) throw error;
+  if (type === 'offer') {
+    const isVideo = req.body.data?.kind === 'video';
+    await sendPush(toId, {
+      title: isVideo ? '🎥 Appel vidéo entrant' : '📞 Appel entrant',
+      body: `${req.user.name} vous appelle.`, url: '/#messages'
+    });
+  }
+  res.json({ ok: true });
 }));
 
 app.get('/api/signal', auth, wrap(async (req, res) => {
-    const me = req.user.id;
-    await run(`DELETE FROM signals WHERE created_at < datetime('now', '-2 minutes')`);
-    const rows = await all('SELECT id, from_id, type, data FROM signals WHERE to_id = ? ORDER BY id ASC', [me]);
-    if (rows.length) await run(`DELETE FROM signals WHERE to_id = ? AND id <= ?`, [me, rows[rows.length - 1].id]);
-    res.json(rows.map(r => ({ id: r.id, from_id: r.from_id, type: r.type, data: r.data ? JSON.parse(r.data) : null })));
+  const me = Number(req.user.id);
+  const expiration = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  await supabase.from('ac_signals').delete().lt('created_at', expiration);
+
+  const { data, error } = await supabase
+    .from('ac_signals').select('id,from_id,type,data').eq('to_id', me).order('id', { ascending: true });
+  if (error) throw error;
+  if ((data || []).length) {
+    const maxId = data[data.length - 1].id;
+    await supabase.from('ac_signals').delete().eq('to_id', me).lte('id', maxId);
+  }
+  res.json((data || []).map(row => ({
+    ...row,
+    data: row.data ? JSON.parse(row.data) : null
+  })));
 }));
 
-// ---------- Blocage ----------
 app.post('/api/block', auth, wrap(async (req, res) => {
-    const toId = parseInt(req.body.userId, 10);
-    if (!toId || toId === req.user.id) return res.status(400).json({ error: 'Requête invalide.' });
-    await run('INSERT OR IGNORE INTO blocks (blocker_id, blocked_id) VALUES (?, ?)', [req.user.id, toId]);
-    res.json({ ok: true });
+  const userId = Number(req.body.userId);
+  if (!userId || userId === Number(req.user.id)) return res.status(400).json({ error: 'Requête invalide.' });
+  const { error } = await supabase.from('ac_blocks').upsert({
+    blocker_id: req.user.id, blocked_id: userId
+  }, { onConflict: 'blocker_id,blocked_id', ignoreDuplicates: true });
+  if (error) throw error;
+  res.json({ ok: true });
 }));
 
-// ---------- Abonnement Premium ----------
 app.post('/api/subscribe', auth, wrap(async (req, res) => {
-    // MODE TEST LOCAL : active Premium 30 jours sans paiement
-    if (TEST_PAYMENT) {
-        const base = isPremium(req.user)
-            ? new Date(req.user.premium_until)
-            : new Date();
+  if (TEST_PAYMENT) {
+    const base = isPremium(req.user) ? new Date(req.user.premium_until) : new Date();
+    base.setDate(base.getDate() + 30);
+    const { error } = await supabase
+      .from('ac_users').update({ premium_until: base.toISOString() }).eq('id', req.user.id);
+    if (error) throw error;
+    return res.json({ ok: true, premium_until: base.toISOString(), test: true });
+  }
 
-        base.setDate(base.getDate() + 30);
-
-        await run(
-            'UPDATE users SET premium_until = ? WHERE id = ?',
-            [base.toISOString(), req.user.id]
-        );
-
-        return res.json({
-            ok: true,
-            premium_until: base.toISOString(),
-            test: true
-        });
-    }
-
-    // MODE PRODUCTION : création du paiement Stripe Checkout
-    if (!process.env.STRIPE_PRICE_ID) {
-        return res.status(500).json({
-            error: 'Le tarif Stripe Premium n’est pas configuré.'
-        });
-    }
-
-    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
-
-    const session = await stripe.checkout.sessions.create({
-        mode: 'subscription',
-
-        line_items: [
-            {
-                price: process.env.STRIPE_PRICE_ID,
-                quantity: 1
-            }
-        ],
-
-        customer_email: req.user.email,
-
-        metadata: {
-            user_id: String(req.user.id)
-        },
-
-        subscription_data: {
-            metadata: {
-                user_id: String(req.user.id)
-            }
-        },
-
-        success_url: `${origin}/?premium=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/?premium=cancel`
-    });
-
-    return res.json({
-        ok: true,
-        test: false,
-        url: session.url
-    });
+  if (!process.env.STRIPE_PRICE_ID) return res.status(500).json({ error: 'Le tarif Stripe Premium n’est pas configuré.' });
+  const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+    customer_email: req.user.email,
+    metadata: { user_id: String(req.user.id) },
+    subscription_data: { metadata: { user_id: String(req.user.id) } },
+    success_url: `${origin}/?premium=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/?premium=cancel`
+  });
+  res.json({ ok: true, test: false, url: session.url });
 }));
-const server = app.listen(PORT, () => {
-    console.log(`Serveur demarre sur http://localhost:${PORT}`);
-    if (TEST_PAYMENT) console.log('Attention : abonnement Premium en MODE TEST (aucun paiement reel).');
-});
 
-server.on('error', (err) => { console.error('ERREUR SERVEUR :', err.message); });
-process.on('uncaughtException', (err) => { console.error('ERREUR NON GEREE :', err); });
-process.on('unhandledRejection', (err) => { console.error('PROMESSE REJETEE :', err); });
+const server = app.listen(PORT, () => {
+  console.log(`Serveur Amour & Cie opérationnel sur le port ${PORT}`);
+  if (TEST_PAYMENT) console.log('MODE TEST PAIEMENT ACTIF');
+});
+server.on('error', err => console.error('ERREUR SERVEUR :', err.message));
+process.on('uncaughtException', err => console.error('ERREUR NON GÉRÉE :', err));
+process.on('unhandledRejection', err => console.error('PROMESSE REJETÉE :', err));
