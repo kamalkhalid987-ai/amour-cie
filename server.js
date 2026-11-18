@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
@@ -40,6 +40,11 @@ const MESSAGE_KINDS = ['text', 'audio', 'image', 'video', 'pdf', 'file'];
 const SIGNAL_TYPES = ['offer', 'answer', 'ice', 'hangup', 'decline'];
 
 app.use(cors());
+
+app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
+// Doit rester avant express.json()
+
 
 // Doit rester avant express.json()
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -619,8 +624,6 @@ app.post('/api/signal', auth, wrap(async (req, res) => {
 
 app.get('/api/signal', auth, wrap(async (req, res) => {
   const me = Number(req.user.id);
-  const expiration = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  await supabase.from('ac_signals').delete().lt('created_at', expiration);
 
   const { data, error } = await supabase
     .from('ac_signals').select('id,from_id,type,data').eq('to_id', me).order('id', { ascending: true });
@@ -668,6 +671,12 @@ app.post('/api/subscribe', auth, wrap(async (req, res) => {
   });
   res.json({ ok: true, test: false, url: session.url });
 }));
+setInterval(async () => {
+  const expiration = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  await supabase.from('ac_signals').delete().lt('created_at', expiration);
+}, 60 * 1000);
+
+
 
 const server = app.listen(PORT, () => {
   console.log(`Serveur Amour & Cie opérationnel sur le port ${PORT}`);
