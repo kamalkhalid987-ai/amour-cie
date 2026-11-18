@@ -651,7 +651,7 @@ let pollTimers = [];
 
 function setMsg(el, t, ok) { el.textContent = t; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
 function toast(t) { const e = $('toast'); e.textContent = t; e.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.add('hidden'), 3000); }
-alert('ORIGIN=' + window.location.origin + '\nAPI_BASE=' + API_BASE);
+
 const API_BASE = window.location.origin === 'https://localhost'
   ? 'https://amour-cie-1.onrender.com'
   : '';
