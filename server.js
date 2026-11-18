@@ -919,24 +919,131 @@ app.post('/api/like', auth, wrap(async (req, res) => {
 
 
 app.get('/api/activity', auth, wrap(async (req, res) => {
-    const me = req.user.id;
-    const sent = await all('SELECT to_id, type FROM likes WHERE from_id = ?', [me]);
-    const received = await all(
-        `SELECT l.type, l.from_id, u.name, u.photos FROM likes l JOIN users u ON u.id = l.from_id
-         WHERE l.to_id = ? AND l.from_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-         ORDER BY l.id DESC`, [me, me]);
-    const matches = await all(
-        `SELECT id, name, city, photos FROM users
-         WHERE id IN (SELECT to_id FROM likes WHERE from_id = ?) AND id IN (SELECT from_id FROM likes WHERE to_id = ?)
-         AND id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-         AND id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)`, [me, me, me, me]);
+    const me = Number(req.user.id);
+
+    // Likes envoyés
+    const { data: sentData, error: sentError } = await supabase
+        .from('ac_likes')
+        .select('to_id, type')
+        .eq('from_id', me);
+
+    if (sentError) {
+        console.error('ERREUR likes envoyés Supabase :', sentError.message);
+        return res.status(500).json({ error: 'Impossible de charger les likes.' });
+    }
+
+    // Likes reçus
+    const { data: receivedLikes, error: receivedError } = await supabase
+        .from('ac_likes')
+        .select('from_id, type')
+        .eq('to_id', me)
+        .order('id', { ascending: false });
+
+    if (receivedError) {
+        console.error('ERREUR likes reçus Supabase :', receivedError.message);
+        return res.status(500).json({ error: 'Impossible de charger les likes reçus.' });
+    }
+
+    // Blocages dans les deux sens
+    const { data: blocksData, error: blocksError } = await supabase
+        .from('ac_blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${me},blocked_id.eq.${me}`);
+
+    if (blocksError) {
+        console.error('ERREUR blocks Supabase :', blocksError.message);
+    }
+
+    const blockedIds = new Set();
+
+    for (const b of (blocksData || [])) {
+        if (Number(b.blocker_id) === me) {
+            blockedIds.add(Number(b.blocked_id));
+        }
+
+        if (Number(b.blocked_id) === me) {
+            blockedIds.add(Number(b.blocker_id));
+        }
+    }
+
+    // IDs des personnes ayant liké le compte
+    const receivedIds = [
+        ...new Set(
+            (receivedLikes || [])
+                .map(l => Number(l.from_id))
+                .filter(id => !blockedIds.has(id))
+        )
+    ];
+
+    let receivedUsers = [];
+
+    if (receivedIds.length) {
+        const { data, error } = await supabase
+            .from('ac_users')
+            .select('id, name, photos')
+            .in('id', receivedIds);
+
+        if (error) {
+            console.error('ERREUR profils likes reçus :', error.message);
+        } else {
+            receivedUsers = data || [];
+        }
+    }
+
+    const usersById = new Map(
+        receivedUsers.map(u => [Number(u.id), u])
+    );
+
+    const received = (receivedLikes || [])
+        .filter(l => !blockedIds.has(Number(l.from_id)))
+        .map(l => {
+            const u = usersById.get(Number(l.from_id));
+
+            if (!u) return null;
+
+            return {
+                type: l.type,
+                from_id: Number(l.from_id),
+                name: u.name,
+                photos: parsePhotos(u)
+            };
+        })
+        .filter(Boolean);
+
+    // Match = like dans les deux sens
+    const sentIds = new Set(
+        (sentData || []).map(l => Number(l.to_id))
+    );
+
+    const matchIds = receivedIds.filter(id =>
+        sentIds.has(id) &&
+        !blockedIds.has(id)
+    );
+
+    let matches = [];
+
+    if (matchIds.length) {
+        const { data, error } = await supabase
+            .from('ac_users')
+            .select('id, name, city, photos')
+            .in('id', matchIds);
+
+        if (error) {
+            console.error('ERREUR matchs Supabase :', error.message);
+        } else {
+            matches = (data || []).map(u => ({
+                ...u,
+                photos: parsePhotos(u)
+            }));
+        }
+    }
+
     res.json({
-        sent,
-        received: received.map(r => ({ ...r, photos: parsePhotos(r) })),
-        matches: matches.map(m => ({ ...m, photos: parsePhotos(m) }))
+        sent: sentData || [],
+        received,
+        matches
     });
 }));
-
 // ---------- Messagerie (entre personnes qui se sont likees) ----------
 app.get('/api/conversations', auth, wrap(async (req, res) => {
     const me = req.user.id;
