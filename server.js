@@ -7,7 +7,8 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_KEY);
 const webpush = require('web-push');
-
+const admin = require('firebase-admin');
+const fs = require('fs');
 const requiredEnv = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_KEY',
@@ -23,6 +24,30 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY,
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
+let firebaseReady = false;
+
+const firebaseServiceAccountPath =
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
+  '/etc/secrets/firebase-service-account.json';
+
+try {
+  if (fs.existsSync(firebaseServiceAccountPath)) {
+    const firebaseServiceAccount = JSON.parse(
+      fs.readFileSync(firebaseServiceAccountPath, 'utf8')
+    );
+
+    admin.initializeApp({
+      credential: admin.credential.cert(firebaseServiceAccount)
+    });
+
+    firebaseReady = true;
+    console.log('Firebase Admin initialisé.');
+  } else {
+    console.warn('Clé Firebase absente :', firebaseServiceAccountPath);
+  }
+} catch (err) {
+  console.error('Initialisation Firebase Admin impossible :', err.message);
+}
 
 webpush.setVapidDetails(
   'mailto:contact@estimbtppro.fr',
@@ -250,6 +275,7 @@ async function sendPush(userId, payload) {
     console.error('Push subscriptions :', error.message);
     return;
   }
+
   for (const sub of data || []) {
     try {
       await webpush.sendNotification({
@@ -264,6 +290,79 @@ async function sendPush(userId, payload) {
     }
   }
 }
+async function sendFcmPush(userId, payload) {
+  if (!firebaseReady) {
+    console.warn('FCM ignoré : Firebase Admin non initialisé.');
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('ac_fcm_tokens')
+    .select('token')
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('FCM tokens :', error.message);
+    return;
+  }
+
+  for (const row of data || []) {
+    try {
+      await admin.messaging().send({
+        token: row.token,
+        notification: {
+          title: String(payload.title || 'Amour & Cie'),
+          body: String(payload.body || '')
+        },
+        data: {
+          url: String(payload.url || '/')
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'calls',
+            priority: 'high',
+            sound: 'default'
+          }
+        }
+      });
+
+      console.log('FCM envoyé à user', userId);
+    } catch (err) {
+      console.error('FCM :', err.message);
+
+      if (
+        err.code === 'messaging/registration-token-not-registered' ||
+        err.code === 'messaging/invalid-registration-token'
+      ) {
+        await supabase
+          .from('ac_fcm_tokens')
+          .delete()
+          .eq('token', row.token);
+      }
+    }
+  }
+}
+app.post('/api/fcm/register', auth, wrap(async (req, res) => {
+  const fcmToken = String(req.body?.token || '').trim();
+
+  if (!fcmToken) {
+    return res.status(400).json({ error: 'Token FCM manquant.' });
+  }
+
+  const { error } = await supabase
+    .from('ac_fcm_tokens')
+    .upsert({
+      user_id: req.user.id,
+      token: fcmToken,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'token' });
+
+  if (error) throw error;
+
+  res.json({ ok: true });
+}));
+
 
 app.get('/api/push/public-key', (_req, res) => res.json({ publicKey: process.env.VAPID_PUBLIC_KEY }));
 
@@ -613,11 +712,20 @@ app.post('/api/signal', auth, wrap(async (req, res) => {
   const { error } = await supabase.from('ac_signals').insert({ from_id: me, to_id: toId, type, data: payload });
   if (error) throw error;
   if (type === 'offer') {
-    const isVideo = req.body.data?.kind === 'video';
-    await sendPush(toId, {
-      title: isVideo ? '🎥 Appel vidéo entrant' : '📞 Appel entrant',
-      body: `${req.user.name} vous appelle.`, url: '/#messages'
-    });
+  const isVideo = req.body.data?.kind === 'video';
+
+  await sendPush(toId, {
+    title: isVideo ? '📹 Appel vidéo entrant' : '📞 Appel entrant',
+    body: `${req.user.name} vous appelle.`,
+    url: '/#messages'
+  });
+
+  await sendFcmPush(toId, {
+    title: isVideo ? '📹 Appel vidéo entrant' : '📞 Appel entrant',
+    body: `${req.user.name} vous appelle.`,
+    url: '/#messages'
+  });
+}
   }
   res.json({ ok: true });
 }));
